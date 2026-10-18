@@ -1196,6 +1196,25 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
   .update-banner button { background: #c8860a; color: var(--ink); border: none; border-radius: 4px; padding: 0.4rem 0.8rem; font-weight: 600; font-family: 'Inter', sans-serif; cursor: pointer; white-space: nowrap; }
   .offline-pill { position: fixed; top: 0.6rem; right: 0.6rem; z-index: 600; background: #8a1f1f; color: #fff; font-family: 'Inter', sans-serif; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.05em; padding: 0.25rem 0.6rem; border-radius: 999px; display: none; }
   body.is-offline .offline-pill { display: block; }
+  /* ── Weekly plan ── */
+  .card-plan { background: none; border: 1px solid var(--border); border-radius: 4px; padding: 0.15rem 0.45rem; font-size: 0.85rem; cursor: pointer; margin-left: auto; margin-right: 0.5rem; color: var(--muted); }
+  .card-plan.on { background: #e3eefa; border-color: #bcd3ec; color: #1f5a96; }
+  .card-select-row { gap: 0.3rem; }
+  .btn-plan-add { display:inline-flex; align-items:center; gap:0.4rem; background: var(--card); color: #1f5a96; border: 1.5px solid #1f5a96; border-radius: 4px; padding: 0.65rem 1.1rem; font-family:'Inter',sans-serif; font-size:0.82rem; font-weight:600; cursor:pointer; }
+  .btn-plan-add.on { background: #1f5a96; color: #fff; }
+  .plan-day { margin-bottom: 1rem; }
+  .plan-day-title { font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 0.35rem; }
+  .plan-item { display:flex; align-items:center; gap:0.5rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
+  .plan-item.done .t { text-decoration: line-through; color: var(--muted); }
+  .plan-item .t { flex: 1; cursor: pointer; min-width: 0; }
+  .plan-item .t:hover { color: var(--accent); }
+  .plan-item select { font-family:'Inter',sans-serif; font-size: 0.75rem; padding: 0.2rem; border:1px solid var(--border); border-radius: 3px; background: var(--card); }
+  .plan-item .srv { font-size: 0.72rem; color: var(--muted); cursor: pointer; border: 1px solid var(--border); border-radius: 3px; padding: 0.15rem 0.35rem; background: var(--card); }
+  .plan-item .x { background:none; border:none; color:var(--muted); cursor:pointer; font-size:1rem; }
+  .plan-item input[type=checkbox] { width: 1.05rem; height: 1.05rem; accent-color: #2a7a4a; }
+  .plan-empty { color: var(--muted); font-size: 0.9rem; padding: 0.6rem 0; line-height: 1.6; }
+  .plan-rollover { background: var(--accent-light); border: 1px solid var(--border); border-radius: 6px; padding: 0.8rem; margin-bottom: 1rem; font-size: 0.85rem; }
+  .plan-rollover .acts { display:flex; gap:0.5rem; margin-top: 0.6rem; flex-wrap: wrap; }
   .btn-check-online {
     margin-top: 0.6rem; background: var(--card); color: var(--accent); border: 1.5px solid var(--accent); border-radius: 4px;
     padding: 0.5rem 0.9rem; font-family: 'Inter', sans-serif; font-size: 0.76rem; font-weight: 600; cursor: pointer;
@@ -1434,6 +1453,7 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
       <p>A B+W Personal Recipe Collection Prototype</p>
     </div>
     <div class="header-actions">
+      <button class="btn-log" onclick="openPlan()">This Week<span class="n" id="plan-count"></span></button>
       <button class="btn-log" onclick="openPantry()">Pantry<span class="n" id="pantry-count"></span></button>
       <button class="btn-log" onclick="openLog()">Cooking Log<span class="n" id="log-count"></span></button>
       <div class="header-stat">
@@ -1667,6 +1687,7 @@ function render() {
   }
 
   let lastTier = null;
+  const planIds = new Set(loadPlan().items.map(i => i.id));
   results.forEach(r => {
     const matched = getMatchedIngredients(r);
     if (have && sortBy === 'relevance') {
@@ -1677,12 +1698,13 @@ function render() {
     card.className = 'card' + (down.has(r.id) ? ' thumbs-down' : '');
     if (selectedRecipes.has(r.id)) card.classList.add('selected');
     card.addEventListener('click', (e) => {
-      if (e.target.closest('.card-checkbox') || e.target.closest('.serving-toggle')) return;
+      if (e.target.closest('.card-checkbox') || e.target.closest('.serving-toggle') || e.target.closest('.card-plan')) return;
       openModal(r);
     });
     card.innerHTML = `
       <div class="card-select-row">
         <div class="card-checkbox" onclick="toggleSelect(event, '${r.id}')">${selectedRecipes.has(r.id) ? '✓' : ''}</div>
+        <button class="card-plan ${planIds.has(r.id) ? 'on' : ''}" onclick="event.stopPropagation();togglePlan('${r.id}')" title="${planIds.has(r.id) ? 'In this week’s plan' : 'Add to this week'}">📅${planIds.has(r.id) ? '✓' : ''}</button>
         <div class="serving-toggle">
           <button class="serving-btn ${(servingOverrides[r.id]||r.servings||2) <= 2 ? 'active' : ''}" onclick="setServing(event,'${r.id}',2)">2 srv</button>
           <button class="serving-btn ${(servingOverrides[r.id]||r.servings||2) >= 4 ? 'active' : ''}" onclick="setServing(event,'${r.id}',4)">4 srv</button>
@@ -1764,7 +1786,7 @@ function openModal(r) {
   }
 
   window._modalRecipe = r;
-  refreshMadeButton(r); refreshRateRow(r);
+  refreshMadeButton(r); refreshRateRow(r); refreshPlanButton(r);
   const altEl = document.getElementById('modal-alt-cards');
   altEl.innerHTML = (r.alt_cards && r.alt_cards.length)
     ? 'Other versions: ' + r.alt_cards.map((a, i) => `<a href="https://drive.google.com/file/d/${a.drive_id}/view" target="_blank" title="${(a.title||'').replace(/"/g,'&quot;')}">card ${i + 2}</a>`).join(' · ')
@@ -2032,7 +2054,7 @@ function forgetDevice() {
   sessionStorage.removeItem('larder_auth'); location.reload();
 }
 loadPantryCatalog().then(() => updatePantryCount()).catch(() => {});
-if (getSyncUrl()) setTimeout(() => syncPantry(false), 2500);
+setTimeout(() => { if (getSyncUrl()) syncPantry(false); }, 2500);  // checked later: sync settings are defined further down
 
 // ── Home-screen app + offline (service worker) ──
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -2046,11 +2068,144 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 function setOnlineState() {
   const off = navigator.onLine === false;
   document.body.classList.toggle('is-offline', off);
-  if (!off && getSyncUrl()) { syncLog(false); syncPantry(false); }  // send anything saved while offline
+  if (!off && getSyncUrl()) { syncLog(false); syncPantry(false); syncPlan(false); }  // send anything saved while offline
 }
 window.addEventListener('online', setOnlineState);
 window.addEventListener('offline', setOnlineState);
 if (navigator.onLine === false) document.body.classList.add('is-offline');
+
+// ── Weekly plan ──
+const PLAN_KEY = 'larder_plan';
+const PLAN_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+function localISODate(x) { return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; }
+// The planning week runs Monday–Sunday, except that on a Sunday you're planning the week ahead.
+function mondayOf(d) { const x = new Date(d); x.setHours(12, 0, 0, 0); const day = x.getDay(); x.setDate(x.getDate() + (day === 0 ? 1 : 1 - day)); return localISODate(x); }
+function loadPlan() {
+  try { const p = JSON.parse(localStorage.getItem(PLAN_KEY) || 'null'); if (p && Array.isArray(p.items)) return { week: p.week || mondayOf(new Date()), items: p.items, updated: p.updated || '', dirty: !!p.dirty }; } catch (e) {}
+  return { week: mondayOf(new Date()), items: [], updated: '', dirty: false };
+}
+function savePlan(p, touch) {
+  if (touch) { p.updated = new Date().toISOString(); p.dirty = true; }
+  try { localStorage.setItem(PLAN_KEY, JSON.stringify(p)); } catch (e) {}
+  updatePlanCount();
+  if (touch) schedulePlanSync();
+}
+function inPlan(id) { return loadPlan().items.some(i => i.id === id); }
+function updatePlanCount() {
+  const el = document.getElementById('plan-count'); if (!el) return;
+  const p = loadPlan(); const left = p.items.filter(i => !i.done).length;
+  el.textContent = p.items.length ? `${left}` : '';
+}
+function refreshPlanButton(r) {
+  const b = document.getElementById('modal-plan-btn'); if (!b || !r) return;
+  const on = inPlan(r.id); b.classList.toggle('on', on); b.textContent = on ? '📅 In this week' : '📅 Add to week';
+}
+function togglePlan(id) {
+  if (!id) return; const r = RECIPES.find(x => x.id === id); if (!r) return;
+  const p = loadPlan();
+  if (p.items.some(i => i.id === id)) { p.items = p.items.filter(i => i.id !== id); showToast('Removed from this week'); }
+  else { p.items.push({ id, title: r.title, day: '', servings: servingOverrides[id] || (r.servings >= 4 ? 4 : 2), done: false, added: new Date().toISOString() }); showToast('Added to this week'); }
+  savePlan(p, true); render(); if (window._modalRecipe && window._modalRecipe.id === id) refreshPlanButton(r);
+  if (document.getElementById('plan-overlay').classList.contains('open')) renderPlan();
+}
+function setPlanField(id, field, value) {
+  const p = loadPlan(); const it = p.items.find(i => i.id === id); if (!it) return;
+  it[field] = value; savePlan(p, true); renderPlan(); if (field === 'done') render();
+}
+function planMarkCooked(recipeId) {
+  const p = loadPlan(); const it = p.items.find(i => i.id === recipeId && !i.done);
+  if (it) { it.done = true; savePlan(p, true); return true; } return false;
+}
+function openPlan() { renderPlan(); document.getElementById('plan-overlay').classList.add('open'); document.body.style.overflow = 'hidden'; syncPlan(false); }
+function closePlan() { document.getElementById('plan-overlay').classList.remove('open'); document.body.style.overflow = ''; }
+function renderPlan() {
+  const p = loadPlan(); const body = document.getElementById('plan-body');
+  const wk = new Date(p.week + 'T12:00:00');
+  const left = p.items.filter(i => !i.done).length, done = p.items.length - left;
+  document.getElementById('plan-summary').innerHTML = `<span class="pill pill-cuisine">Week of ${wk.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>` +
+    (p.items.length ? `<span class="pill pill-dish">${left} to cook</span>${done ? `<span class="pill pill-protein">${done} cooked</span>` : ''}` : '');
+  document.getElementById('btn-plan-groceries').disabled = !left;
+  let html = '';
+  if (p.week < mondayOf(new Date()) && p.items.length) {
+    html += `<div class="plan-rollover">This plan is from the week of ${wk.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}.${left ? ` ${left} meal${left === 1 ? '' : 's'} didn’t get cooked.` : ''}<div class="acts"><button class="btn-log-action" onclick="startNextWeek(true)">Start this week${left ? ', carry them over' : ''}</button><button class="btn-log-action" onclick="startNextWeek(false)">Start fresh</button></div></div>`;
+  }
+  if (!p.items.length) {
+    body.innerHTML = html + '<div class="plan-empty">Nothing planned yet. Tap 📅 on any recipe (or “Add to week” inside a recipe) to add it here. Then build one grocery list for the whole week.</div>';
+    return;
+  }
+  const groups = PLAN_DAYS.map(d => ({ d, label: d, items: p.items.filter(i => i.day === d) })).concat([{ d: '', label: 'Anytime', items: p.items.filter(i => !i.day) }]);
+  groups.forEach(g => {
+    if (!g.items.length) return;
+    html += `<div class="plan-day"><div class="plan-day-title">${g.label}</div>` + g.items.map(i => {
+      const sid = i.id.replace(/'/g, "\\'");
+      return `<div class="plan-item ${i.done ? 'done' : ''}"><input type="checkbox" ${i.done ? 'checked' : ''} title="Cooked" onchange="setPlanField('${sid}','done',this.checked)">` +
+        `<span class="t" onclick="closePlan();openModal(RECIPES.find(r=>r.id==='${sid}'))">${escapeHtml(i.title)}</span>` +
+        `<span class="srv" title="Servings" onclick="setPlanField('${sid}','servings',${i.servings >= 4 ? 2 : 4})">${i.servings} srv</span>` +
+        `<select onchange="setPlanField('${sid}','day',this.value)"><option value="">Anytime</option>${PLAN_DAYS.map(d => `<option ${i.day === d ? 'selected' : ''}>${d}</option>`).join('')}</select>` +
+        `<button class="x" title="Remove" onclick="togglePlan('${sid}')">✕</button></div>`;
+    }).join('') + '</div>';
+  });
+  body.innerHTML = html;
+}
+function buildPlanGroceries() {
+  const p = loadPlan(); const todo = p.items.filter(i => !i.done && RECIPES.some(r => r.id === i.id));
+  if (!todo.length) { showToast('Nothing left to shop for this week'); return; }
+  selectedRecipes.clear();
+  todo.forEach(i => { selectedRecipes.add(i.id); servingOverrides[i.id] = i.servings; });
+  closePlan(); updateGroceryBar(); render(); buildGroceryList();
+}
+function startNextWeek(carry) {
+  const p = loadPlan(); const left = p.items.filter(i => !i.done);
+  if (carry === undefined) {
+    if (!p.items.length) { showToast('Plan is already empty'); return; }
+    carry = left.length ? confirmCarry(left.length) : false;
+    if (carry === null) return;
+  }
+  const thisMonday = mondayOf(new Date());
+  const nextWeek = p.week >= thisMonday ? mondayOf(new Date(Date.now() + 7 * 86400000)) : thisMonday;
+  savePlan({ week: nextWeek, items: carry ? left.map(i => ({ ...i, day: '' })) : [], updated: '', dirty: false }, true);
+  renderPlan(); render(); showToast(carry ? `New week started · ${left.length} carried over` : 'New week started');
+}
+function confirmCarry(n) {
+  // In-page choice (no browser dialogs): reuse the rollover box.
+  const body = document.getElementById('plan-body');
+  body.insertAdjacentHTML('afterbegin', `<div class="plan-rollover" id="carry-box">${n} meal${n === 1 ? '' : 's'} not cooked yet. Carry ${n === 1 ? 'it' : 'them'} into next week?<div class="acts"><button class="btn-log-action" onclick="startNextWeek(true)">Carry over</button><button class="btn-log-action" onclick="startNextWeek(false)">Start fresh</button><button class="btn-log-action" onclick="document.getElementById('carry-box').remove()">Cancel</button></div></div>`);
+  return null;
+}
+let _planSyncTimer = null, _planSyncing = null;
+function schedulePlanSync() { clearTimeout(_planSyncTimer); _planSyncTimer = setTimeout(() => syncPlan(false), 1500); }
+async function syncPlan(verbose) {
+  if (_planSyncing) { await _planSyncing.catch(() => {}); if (!loadPlan().dirty && !verbose) return; }
+  _planSyncing = _syncPlanOnce(verbose); try { await _planSyncing; } finally { _planSyncing = null; }
+}
+async function _syncPlanOnce(verbose) {
+  const url = getSyncUrl(); const note = document.getElementById('plan-sync-note');
+  if (!url) return;
+  try {
+    let p = loadPlan();
+    if (p.dirty) {
+      const res = await fetch(url, { method: 'POST', body: JSON.stringify({ plan: { week: p.week, items: p.items, updated: p.updated } }) });
+      if (!res.ok) throw new Error('push ' + res.status);
+      const j = await res.json().catch(() => ({}));
+      if (j && j.error) throw new Error(j.error);
+      if (!(j && j.plan)) throw new Error('Google script needs the v3 update');
+      p.dirty = false; savePlan(p, false);
+    }
+    const res = await fetch(url + (url.includes('?') ? '&' : '?') + 'action=plan');
+    if (!res.ok) throw new Error('pull ' + res.status);
+    const j = await res.json();
+    if (j && j.error === 'unknown action') throw new Error('Google script needs the v3 update');
+    const remote = j && j.plan; p = loadPlan();
+    if (remote && remote.updated && remote.updated > (p.updated || '') && !p.dirty) {
+      savePlan({ week: remote.week || p.week, items: remote.items || [], updated: remote.updated, dirty: false }, false);
+      if (document.getElementById('plan-overlay').classList.contains('open')) renderPlan();
+      render();
+    }
+    if (note) note.textContent = `Synced ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+  } catch (e) { if (note) note.textContent = (/v3 update/.test(e.message) ? 'Saved on this device. (Google script needs the v3 update to sync.)' : 'Sync failed (' + e.message + '). Saved on this device.'); if (verbose) showToast('Plan sync failed'); }
+}
+updatePlanCount();
+setTimeout(() => { if (getSyncUrl()) syncPlan(false); }, 3000);
 
 // ── Cooking Log ──
 const LOG_KEY = 'larder_cooklog';
@@ -2154,6 +2309,7 @@ function logMade() {
   };
   const log = loadLog(); log.push(entry); saveLog(log);
   refreshMadeButton(r, true); refreshRateRow(r);
+  if (planMarkCooked(r.id)) { render(); }
   setTimeout(() => refreshMadeButton(r, false), 1200);
   showToast(`Logged: ${r.title} — make again?`);
   syncLogEntry(entry);
@@ -3340,6 +3496,7 @@ window.addEventListener('load', _tryRenderShared);
       </div>
       <div class="modal-footer-actions">
         <div class="rate-row" id="rate-row" style="display:none;width:100%;"><span>Make again?</span><button id="rate-up" onclick="rateRecipe(1)">👍</button><button id="rate-down" onclick="rateRecipe(-1)">👎</button><input id="rate-note" placeholder="Note (optional) — e.g. double the sauce" onchange="saveRateNote()"></div>
+        <button class="btn-plan-add" id="modal-plan-btn" onclick="togglePlan(window._modalRecipe && window._modalRecipe.id)">📅 Add to week</button>
         <button class="btn-made" id="modal-made-btn" onclick="logMade()">✓ Made it <span class="cnt" id="modal-made-cnt"></span></button>
         <a class="btn-recipe-card disabled" id="modal-card-btn" href="#" target="_blank">
           ↗ View Recipe Card
@@ -3383,6 +3540,26 @@ window.addEventListener('load', _tryRenderShared);
     </div>
   </div>
 </div>
+<!-- Weekly Plan Modal -->
+<div class="modal-overlay" id="plan-overlay" onclick="if(event.target===this)closePlan()">
+  <div class="modal" id="plan-modal">
+    <div class="modal-header">
+      <button class="modal-close" onclick="closePlan()">✕</button>
+      <div class="modal-source">The Larder</div>
+      <div class="modal-title">This Week</div>
+      <div class="modal-pills" id="plan-summary"></div>
+    </div>
+    <div class="modal-body" id="plan-body"></div>
+    <div class="modal-footer">
+      <span class="modal-file-path" id="plan-sync-note">Saved on this device.</span>
+      <div class="modal-footer-actions">
+        <button class="btn-log-action" onclick="startNextWeek()">Start next week</button>
+        <button class="btn-build-list" id="btn-plan-groceries" onclick="buildPlanGroceries()">Grocery list for the week</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Pantry Modal -->
 <div class="modal-overlay" id="pantry-overlay" onclick="if(event.target===this)closePantry()">
   <div class="modal" id="pantry-modal">
