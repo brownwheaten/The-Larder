@@ -27,6 +27,7 @@
             ENTER
           </button>
         </div>
+        <label style="display:block;margin-top:1.1rem;font-size:0.8rem;color:#a89880;cursor:pointer;"><input type="checkbox" id="pw-remember" checked style="margin-right:0.4rem;vertical-align:middle;">Remember this device</label>
         <div id="pw-err" style="color:#c0392b;font-size:0.8rem;margin-top:1rem;min-height:1.2rem;"></div>
       </div>`;
     document.body.appendChild(overlay);
@@ -37,6 +38,7 @@
       sha256(val).then(h => {
         if (h === HASH) {
           sessionStorage.setItem("larder_auth", HASH);
+          try { if (document.getElementById("pw-remember").checked) localStorage.setItem("larder_auth_device", HASH); } catch (e) {}
           document.getElementById("pw-overlay").remove();
         } else {
           document.getElementById("pw-err").textContent = "Incorrect password. Please try again.";
@@ -52,7 +54,8 @@
 
   // Skip password gate entirely if this is a shared shopping list link
   var isSharedList = window.location.hash.indexOf("#list=") === 0;
-  if (!isSharedList && sessionStorage.getItem("larder_auth") !== HASH) {
+  var remembered = false; try { remembered = localStorage.getItem("larder_auth_device") === HASH; } catch (e) {}
+  if (!isSharedList && !remembered && sessionStorage.getItem("larder_auth") !== HASH) {
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", lock);
     } else {
@@ -1122,6 +1125,58 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
   .local-badge.coop { background:#efe7f6; color:#5d3b80; border:1px solid #d9c7ea; }
   .local-snap-toggle { display:inline-flex; align-items:center; gap:0.35rem; font-size:0.75rem; color:var(--ink); margin-top:0.6rem; cursor:pointer; user-select:none; }
   .local-snap-toggle input { accent-color:#1f5a96; }
+  /* ── Pantry ── */
+  .btn-pantry-mode {
+    display:inline-flex; align-items:center; gap:0.45rem; margin-top:0.75rem; background: transparent; color: var(--paper);
+    border: 1px solid rgba(246,242,235,0.35); border-radius: 4px; padding: 0.5rem 0.9rem; font-family:'Inter',sans-serif;
+    font-size: 0.78rem; font-weight: 600; cursor: pointer; letter-spacing: 0.04em;
+  }
+  .btn-pantry-mode:hover { border-color: var(--paper); }
+  .btn-pantry-mode.on { background: #2a7a4a; border-color: #2a7a4a; color: #fff; }
+  .btn-pantry-mode .cnt { font-weight: 400; opacity: 0.8; }
+  .pantry-hint { font-size: 0.72rem; color: var(--muted); margin-top: 0.4rem; }
+  .pantry-hint a { color: #c8860a; cursor: pointer; }
+  .tier-head { grid-column: 1 / -1; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 0.6rem 0 0.1rem; border-bottom: 1px solid var(--border); margin-bottom: 0.2rem; }
+  .tier-head:first-child { padding-top: 0; }
+  .tier-head b { color: var(--accent); }
+  .card .missing { font-size: 0.74rem; color: #8a5a00; margin: 0.35rem 0 0.1rem; line-height: 1.5; }
+  .card .missing span { text-decoration: underline dotted; cursor: pointer; }
+  .card .missing span:hover { color: var(--accent); }
+  .card .missing.none { color: #2a7a4a; }
+  .card .fav { color: #c8860a; margin-right: 0.3rem; }
+  .card.thumbs-down .card-title { color: var(--muted); }
+  .btn-fav-filter { background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 0.5rem 0.9rem; font-family:'Inter',sans-serif; font-size: 0.78rem; cursor: pointer; color: var(--ink); white-space: nowrap; }
+  .btn-fav-filter.on { background: #fdf1dc; border-color: #c8860a; color: #8a5a00; }
+  .pantry-tabs { display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom: 0.9rem; }
+  .pantry-tab { background: var(--card); border:1px solid var(--border); border-radius: 999px; padding: 0.3rem 0.8rem; font-size: 0.76rem; cursor:pointer; font-family:'Inter',sans-serif; color: var(--ink); }
+  .pantry-tab.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .pantry-search { width:100%; font-family:'Inter',sans-serif; font-size:0.9rem; padding:0.6rem 0.8rem; border:1px solid var(--border); border-radius:4px; background: var(--card); margin-bottom: 0.9rem; }
+  .pantry-cat { margin-bottom: 1.1rem; }
+  .pantry-cat-title { font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 0.45rem; display:flex; justify-content:space-between; }
+  .pantry-cat-title .cnt { font-weight: 400; letter-spacing: 0; text-transform: none; }
+  .pantry-chips { display:flex; flex-wrap:wrap; gap:0.35rem; }
+  .pchip { display:inline-flex; align-items:center; gap:0.35rem; font-size:0.78rem; padding:0.3rem 0.65rem; border-radius:999px; border:1px solid var(--border); background: var(--card); color: var(--muted); cursor:pointer; user-select:none; font-family:'Inter',sans-serif; }
+  .pchip.have { background:#e8f5ee; border-color:#b8dfc8; color:#1f5a38; }
+  .pchip.growing { background:#e3f0d6; border-color:#a9cf8a; color:#2d5a16; }
+  .pchip.out { background:#fdeaea; border-color:#f0b9b9; color:#8a1f1f; text-decoration: line-through; }
+  .pchip .g { font-size:0.8rem; opacity:0.55; padding-left:0.2rem; border-left:1px solid rgba(0,0,0,0.12); margin-left:0.1rem; }
+  .pchip.growing .g, .pchip.have .g:hover { opacity:1; }
+  .pantry-legend { font-size:0.7rem; color:var(--muted); margin: 0 0 0.9rem; line-height:1.7; }
+  .pantry-legend i { display:inline-block; width:0.7rem; height:0.7rem; border-radius:50%; vertical-align:middle; margin:0 0.25rem 0 0.5rem; border:1px solid var(--border); }
+  .pantry-add { display:flex; gap:0.5rem; margin-top: 0.4rem; }
+  .pantry-add input { flex:1; min-width:0; font-family:'Inter',sans-serif; font-size:0.85rem; padding:0.5rem 0.7rem; border:1px solid var(--border); border-radius:4px; background: var(--card); }
+  .pantry-empty { color: var(--muted); font-size:0.88rem; padding: 0.6rem 0; }
+  .out-list { list-style:none; }
+  .out-list li { display:flex; justify-content:space-between; align-items:center; padding:0.5rem 0; border-bottom:1px solid var(--border); font-size:0.88rem; }
+  .out-list li .cat { font-size:0.7rem; color: var(--muted); margin-left: 0.5rem; }
+  .out-list li .acts button { background:none; border:none; cursor:pointer; font-size:0.78rem; color: var(--accent); padding:0 0.35rem; font-family:'Inter',sans-serif; }
+  .rate-row { display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-top:0.6rem; font-size:0.78rem; color: var(--muted); }
+  .rate-row button { background: var(--card); border:1px solid var(--border); border-radius: 4px; padding: 0.3rem 0.6rem; cursor:pointer; font-size: 0.95rem; }
+  .rate-row button.on { border-color: var(--accent); background: var(--accent-light); }
+  .rate-row input { flex:1; min-width: 140px; font-family:'Inter',sans-serif; font-size:0.8rem; padding:0.35rem 0.55rem; border:1px solid var(--border); border-radius:4px; background: var(--card); }
+  .log-entry .r { margin-right: 0.3rem; }
+  .log-entry .note { display:block; font-size:0.74rem; color: var(--muted); font-style: italic; }
+  @media (max-width: 600px) { .pantry-add { flex-wrap: wrap; } }
   .btn-check-online {
     margin-top: 0.6rem; background: var(--card); color: var(--accent); border: 1.5px solid var(--accent); border-radius: 4px;
     padding: 0.5rem 0.9rem; font-family: 'Inter', sans-serif; font-size: 0.76rem; font-weight: 600; cursor: pointer;
@@ -1360,6 +1415,7 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
       <p>A B+W Personal Recipe Collection Prototype</p>
     </div>
     <div class="header-actions">
+      <button class="btn-log" onclick="openPantry()">Pantry<span class="n" id="pantry-count"></span></button>
       <button class="btn-log" onclick="openLog()">Cooking Log<span class="n" id="log-count"></span></button>
       <div class="header-stat">
         <div class="num" id="total-count">—</div>
@@ -1376,6 +1432,8 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
       <button class="btn-add" onclick="addIngredient()">Add</button>
     </div>
     <div class="tags" id="ingredient-tags"></div>
+    <button class="btn-pantry-mode" id="btn-pantry-mode" onclick="togglePantryMode()">🏠 Cook from my pantry <span class="cnt" id="pantry-mode-cnt"></span></button>
+    <div class="pantry-hint" id="pantry-hint" style="display:none;"></div>
     <div class="match-toggle" id="match-toggle-row" style="display:none;">
       <span class="match-toggle-label">Match:</span>
       <div class="match-toggle-btns">
@@ -1417,6 +1475,7 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
         <option value="alpha">A → Z</option>
       </select>
     </div>
+    <button class="btn-fav-filter" id="btn-fav-filter" onclick="toggleFavFilter()">★ Favorites</button>
     <button class="btn-clear" onclick="clearAll()">Clear all</button>
   </div>
 </div>
@@ -1438,6 +1497,9 @@ let ingredients = [];
 const selectedRecipes = new Set();
 const servingOverrides = {};
 let matchMode = 'any'; // 'any' or 'all'
+let PANTRY_CATALOG = null;   // loaded from data/pantry_catalog.json (pantry feature)
+let pantryMode = false;
+let favFilter = false;
 
 function populateFilters() {
   document.getElementById('total-count').textContent = RECIPES.length;
@@ -1537,7 +1599,13 @@ function render() {
   const meal = document.getElementById('filter-meal').value;
   const sortBy = document.getElementById('sort-by').value;
 
+  const favs = favFilter ? favoriteIds() : null;
+  const down = thumbsDownIds();
+  const have = pantryMode && PANTRY_CATALOG ? haveSetCached() : null;
+  const missingOf = {};
   let results = RECIPES.filter(r => {
+    if (favs && !favs.has(r.id)) return false;
+    if (have) { const m = recipeMissing(r, have); if (m.length > PANTRY_MAX_MISSING) return false; missingOf[r.id] = m; }
     if (cuisine && r.cuisine !== cuisine) return false;
     if (protein && r.protein !== protein) return false;
     if (dish && r.dish_type !== dish) return false;
@@ -1552,7 +1620,9 @@ function render() {
     return true;
   });
 
-  if (sortBy === 'relevance' && ingredients.length > 0) {
+  if (sortBy === 'relevance' && have) {
+    results.sort((a, b) => (missingOf[a.id].length - missingOf[b.id].length) || (getTotalMatchCount(b) - getTotalMatchCount(a)) || a.title.localeCompare(b.title));
+  } else if (sortBy === 'relevance' && ingredients.length > 0) {
     results.sort((a, b) => getTotalMatchCount(b) - getTotalMatchCount(a));
   } else if (sortBy === 'time') {
     results.sort((a, b) => parseCookTime(a.cook_time_minutes) - parseCookTime(b.cook_time_minutes));
@@ -1562,6 +1632,7 @@ function render() {
     results.sort((a, b) => a.title.localeCompare(b.title));
   }
 
+  if (down.size) { const keep = results.filter(r => !down.has(r.id)); const sunk = results.filter(r => down.has(r.id)); results = keep.concat(sunk); }
   document.getElementById('result-count').textContent = results.length;
   document.getElementById('result-label').textContent = results.length === 1 ? 'recipe' : 'recipes';
 
@@ -1576,10 +1647,15 @@ function render() {
     return;
   }
 
+  let lastTier = null;
   results.forEach(r => {
     const matched = getMatchedIngredients(r);
+    if (have && sortBy === 'relevance') {
+      const n = missingOf[r.id].length; const tier = n === 0 ? 'You have everything' : n === 1 ? 'Missing 1 item' : `Missing ${n} items`;
+      if (tier !== lastTier) { const th = document.createElement('div'); th.className = 'tier-head'; th.innerHTML = tier; grid.appendChild(th); lastTier = tier; }
+    }
     const card = document.createElement('div');
-    card.className = 'card';
+    card.className = 'card' + (down.has(r.id) ? ' thumbs-down' : '');
     if (selectedRecipes.has(r.id)) card.classList.add('selected');
     card.addEventListener('click', (e) => {
       if (e.target.closest('.card-checkbox') || e.target.closest('.serving-toggle')) return;
@@ -1593,7 +1669,7 @@ function render() {
           <button class="serving-btn ${(servingOverrides[r.id]||r.servings||2) >= 4 ? 'active' : ''}" onclick="setServing(event,'${r.id}',4)">4 srv</button>
         </div>
       </div>
-      <div class="card-title">${r.title}</div>
+      <div class="card-title">${favs !== null || isFavorite(r.id) ? (isFavorite(r.id) ? '<span class="fav">★</span>' : '') : ''}${r.title}</div>
       <div class="card-meta">
         ${r.cuisine ? `<span class="pill pill-cuisine">${r.cuisine}</span>` : ''}
         ${r.protein ? `<span class="pill pill-protein">${r.protein}</span>` : ''}
@@ -1601,6 +1677,7 @@ function render() {
         ${r.meal_type && r.meal_type !== 'dinner' ? `<span class="pill pill-meal">${r.meal_type}</span>` : ''}
       </div>
       ${matched.length > 0 ? `<div class="matched">${matched.slice(0, 5).join(', ')}${matched.length > 5 ? ' +' + (matched.length - 5) + ' more' : ''}</div>` : ''}
+      ${have ? (missingOf[r.id].length ? `<div class="missing">missing: ${missingOf[r.id].map(m => `<span onclick="event.stopPropagation();addToOut('${m.replace(/'/g, "\\'")}')" title="Add to Out list">${escapeHtml(m)}</span>`).join(', ')}</div>` : '<div class="missing none">✓ you have everything</div>') : ''}
       <div class="card-stats">
         ${r.cook_time_minutes ? `<span>⏱ ${r.cook_time_minutes} min</span>` : ''}
         ${r.calories_per_serving ? `<span>${r.calories_per_serving} cal</span>` : ''}
@@ -1668,7 +1745,7 @@ function openModal(r) {
   }
 
   window._modalRecipe = r;
-  refreshMadeButton(r);
+  refreshMadeButton(r); refreshRateRow(r);
   const altEl = document.getElementById('modal-alt-cards');
   altEl.innerHTML = (r.alt_cards && r.alt_cards.length)
     ? 'Other versions: ' + r.alt_cards.map((a, i) => `<a href="https://drive.google.com/file/d/${a.drive_id}/view" target="_blank" title="${(a.title||'').replace(/"/g,'&quot;')}">card ${i + 2}</a>`).join(' · ')
@@ -1707,6 +1784,232 @@ document.addEventListener('keydown', e => {
 });
 
 
+// Ingredient normalizer shared by the Larder (runtime) and the catalog build.
+const STRIP_WORDS = ['fresh','baby','organic','local','large','medium','small','extra','jumbo','boneless','skinless','bone-in','skin-on','chopped','diced','sliced','minced','grated','shredded','crumbled','cubed','whole','ripe','raw','cooked','frozen','thawed','peeled','unpeeled','seedless','pitted','halved','quartered','trimmed','divided','container','packets','packet','pkg','package','can','canned','jar','bunch','bunches','head','heads','clove','cloves','sprig','sprigs','stalk','stalks','ear','ears','piece','pieces','slice','slices','of','and','or','with','your','own','pre-cut','precut','quick-cooking','quick','cooking','instant','plain','unsalted','salted','sweetened','unsweetened','full-fat','low-fat','lowfat','nonfat','reduced-fat','light','lite','regular','style','grass-fed','pasture-raised','free-range','hormone-free','antibiotic-free','natural','premium','select','use','half','only','ready','to','heat','ready-to-heat','inch','grain','thick-cut','thin-cut','mini'];
+const STRIP_RE = new RegExp('\\b(' + STRIP_WORDS.map(w => w.replace(/-/g, '\\-')).join('|') + ')\\b', 'g');
+const KEEP_S = new Set(['asparagus','couscous','hummus','grits','oats','molasses','brussels','swiss','haricots','pepperoncini','chickpeas']);
+const ALIASES = {
+  'parmesan cheese':'parmesan','shaved parmesan cheese':'parmesan','shaved parmesan':'parmesan','grated parmesan cheese':'parmesan','grated parmesan':'parmesan','parmigiano reggiano':'parmesan',
+  'feta cheese':'feta','mozzarella cheese':'mozzarella','ricotta cheese':'ricotta','mascarpone cheese':'mascarpone','cheddar cheese':'cheddar','white cheddar cheese':'white cheddar','monterey jack cheese':'monterey jack','goat cheese crumble':'goat cheese','blue cheese crumble':'blue cheese','gruyere cheese':'gruyere','fontina cheese':'fontina','cheddar-jack blend':'cheddar-jack','cheddar jack blend':'cheddar-jack',
+  'tamari soy sauce':'tamari','gluten-free soy sauce':'soy sauce','all-purpose flour':'flour','granulated sugar':'sugar','white sugar':'sugar','confectioners sugar':'powdered sugar','toasted sesame oil':'sesame oil','panko breadcrumb':'panko','panko breadcrumbs':'panko',
+  'za atar spice mix':'za atar spice blend','za atar':'za atar spice blend','baharat spice mix':'baharat spice blend','baharat spice':'baharat spice blend','baharat':'baharat spice blend','italian dried herb mix':'italian seasoning','italian dried herb blend':'italian seasoning','italian herb blend':'italian seasoning','everything bagel spice mix':'everything bagel seasoning','mexican spice blend':'mexican spice mix','tex-mex spice mix':'tex-mex spice blend','harissa spice mix':'harissa spice blend','cajun spice blend':'cajun seasoning','fajita spice blend':'fajita spice mix','basque spice blend':'basque spice mix','mediterranean spice blend':'mediterranean spice mix','southwestern spice blend':'southwestern spice mix','warm spice mix':'warm spice blend','bbq spice mix':'bbq spice blend','pie spice mix':'pie spice blend','berbere spice mix':'berbere spice blend','berbere':'berbere spice blend','chorizo chili spice mix':'chorizo chili spice blend',
+  'roasted peanut':'peanut','roasted almond':'almond','roasted cashew':'cashew','slivered almond':'almond','sliced almond':'almond','toasted sesame seed':'sesame seed','mixed sesame seed':'sesame seed','roasted sunflower seed':'sunflower seed',
+  'chicken breast strip':'chicken breast','cubed chicken thigh':'chicken thigh','chicken thigh strip':'chicken thigh','ground beef pork veal':'ground meatloaf mix','jalape o chile':'jalapeno','jalape o':'jalapeno','jalapeno chile':'jalapeno','jalapeno pepper':'jalapeno','red radish':'radish','curly kale':'kale','tuscan kale':'kale','lacinato kale':'kale','romaine heart':'romaine','romaine lettuce':'romaine','yukon gold potato':'potato','russet potato':'potato','red-skinned potato':'potato','red potato':'potato','fingerling potato':'potato','plum tomato':'tomato','grape tomato':'cherry tomato','red bell pepper':'bell pepper','green bell pepper':'bell pepper','yellow bell pepper':'bell pepper','orange bell pepper':'bell pepper','green onion':'scallion','flat-leaf parsley':'parsley','italian parsley':'parsley','cilantro leaf':'cilantro','basil leaf':'basil','mint leaf':'mint','thai basil':'basil',
+  'butter stick':'butter','salted butter':'butter','grape tomato':'cherry tomato','red-skinned potato':'potato','yukon gold potato':'potato','russet potato':'potato','fingerling potato':'potato','sweet potatoes':'sweet potato','haricots vert':'green bean','haricot vert':'green bean','english cucumber':'cucumber','persian cucumber':'cucumber','red radish':'radish','sweet pepper':'bell pepper','mini sweet pepper':'bell pepper','roasted red pepper':'roasted red peppers',
+  'chicken broth concentrate':'chicken broth','chicken stock':'chicken broth','chicken bouillon cube':'chicken broth','chicken bouillon':'chicken broth','beef broth concentrate':'beef broth','beef stock':'beef broth','beef bouillon cube':'beef broth','turkey broth concentrate':'chicken broth','vegetable broth concentrate':'vegetable broth','vegetable stock':'vegetable broth','vegetable bouillon cube':'vegetable broth',
+  'dark brown sugar':'brown sugar','light brown sugar':'brown sugar','whole-grain mustard':'grain mustard','grain mustard':'whole grain mustard','basil pesto':'pesto','gochugaru flake':'gochugaru','ground':'',
+};
+function canonIngredient(s) {
+  let t = String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  t = t.replace(/\([^)]*\)/g, ' ');
+  t = t.replace(/\b\d+(\.\d+)?\s*(oz|ounce|ounces|lb|lbs|pound|pounds|g|gram|grams|ml|inch|in|ct|count)\b(\s*each)?/g, ' ');
+  t = t.replace(/\b\d+([\/.]\d+)?\b/g, ' ');
+  t = t.replace(/[^a-z\s-]/g, ' ');
+  t = t.replace(STRIP_RE, ' ');
+  t = t.replace(/(^|\s)-+|-+(\s|$)/g, ' ');
+  t = t.replace(/\s+/g, ' ').trim();
+  if (t && !KEEP_S.has(t)) {
+    const last = t.split(' ').pop();
+    if (!KEEP_S.has(last)) {
+      t = t.replace(/(\w+?)ies$/, '$1y').replace(/(\w+?)(oes|ches|shes|sses|xes)$/, (m, a, b) => a + b.slice(0, -2)).replace(/(\w{3,}?)s$/, (m, a) => /(ss|us|is)$/.test(a + 's') ? a + 's' : a);
+    }
+  }
+  if (t === 'ground') return '';
+  return ALIASES[t] || t;
+}
+
+// ── Pantry ──
+const PANTRY_KEY = 'larder_pantry';
+const PANTRY_MAX_MISSING = 3;
+let _pantryTab = 'all';
+let _pantryLoadPromise = null;
+function loadPantryCatalog() {
+  if (!_pantryLoadPromise) {
+    _pantryLoadPromise = fetch('data/pantry_catalog.json', { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error('catalog ' + r.status); return r.json(); })
+      .then(c => { PANTRY_CATALOG = c; try { localStorage.setItem('larder_pantry_catalog', JSON.stringify(c)); } catch (e) {} return c; })
+      .catch(e => { try { const c = JSON.parse(localStorage.getItem('larder_pantry_catalog') || 'null'); if (c) { PANTRY_CATALOG = c; return c; } } catch (x) {} _pantryLoadPromise = null; throw e; });
+  }
+  return _pantryLoadPromise;
+}
+function loadPantry() {
+  try { const p = JSON.parse(localStorage.getItem(PANTRY_KEY) || '{}'); return { items: p.items || {}, custom: p.custom || [], updated: p.updated || '', dirty: !!p.dirty }; }
+  catch (e) { return { items: {}, custom: [], updated: '', dirty: false }; }
+}
+function savePantry(p, touch) {
+  if (touch) { p.updated = new Date().toISOString(); p.dirty = true; }
+  try { localStorage.setItem(PANTRY_KEY, JSON.stringify(p)); } catch (e) {}
+  updatePantryCount();
+  if (touch) { schedulePantrySync(); if (pantryMode) render(); }
+}
+function pantryItems() {
+  const p = loadPantry(); const cat = PANTRY_CATALOG ? PANTRY_CATALOG.items : [];
+  return cat.concat(p.custom.map(c => ({ k: c.k, n: c.n, c: c.c || 'other', u: 0, custom: true })));
+}
+function pantryDefault(item) {
+  if (!PANTRY_CATALOG) return 'none';
+  if (item.seed) return item.seed;
+  const d = PANTRY_CATALOG.defaults || {}; return d[item.c] || 'none';
+}
+function pantryState(item, p) {
+  p = p || loadPantry(); const s = p.items[item.k];
+  return s || pantryDefault(item);
+}
+// Set of canonical keys considered on hand (have + growing + makeable blends).
+function pantryHaveSet() {
+  const p = loadPantry(); const have = new Set();
+  pantryItems().forEach(it => { const s = pantryState(it, p); if (s === 'have' || s === 'growing') have.add(it.k); });
+  const blends = (PANTRY_CATALOG && PANTRY_CATALOG.blends) || {};
+  Object.keys(blends).forEach(b => { if (!have.has(b) && blends[b].every(c => have.has(c))) have.add(b); });
+  return have;
+}
+let _haveCache = null;
+function haveSetCached() { if (!_haveCache) _haveCache = pantryHaveSet(); return _haveCache; }
+function invalidateHave() { _haveCache = null; }
+function pantryHas(itemName, have) {
+  have = have || haveSetCached();
+  const k = canonIngredient(itemName); if (!k) return true;
+  if (have.has(k)) return true;
+  // generic fallbacks: "chicken" covers chicken breast etc.; a have-item that is a word-boundary prefix/suffix of the ingredient
+  for (const hk of have) { if (hk.length >= 4 && (k === hk || k.endsWith(' ' + hk) || k.startsWith(hk + ' '))) return true; }
+  return false;
+}
+function recipeMissing(r, have) {
+  have = have || haveSetCached(); const miss = [];
+  (r.ingredients || []).forEach(i => {
+    if (!i.item || isPantryStaple(i.item)) return;
+    if (/parchment|aluminum|foil|skewer/i.test(i.item)) return;
+    if (!pantryHas(i.item, have)) miss.push(i.item);
+  });
+  return miss;
+}
+function updatePantryCount() {
+  const el = document.getElementById('pantry-count'); if (!el || !PANTRY_CATALOG) return;
+  invalidateHave();
+  const p = loadPantry(); let have = 0, out = 0;
+  pantryItems().forEach(it => { const s = pantryState(it, p); if (s === 'have' || s === 'growing') have++; else if (s === 'out') out++; });
+  el.textContent = out ? `${out} out` : '';
+  const c = document.getElementById('pantry-mode-cnt'); if (c) c.textContent = `(${have})`;
+}
+function togglePantryMode() {
+  pantryMode = !pantryMode;
+  const b = document.getElementById('btn-pantry-mode'); b.classList.toggle('on', pantryMode);
+  const hint = document.getElementById('pantry-hint');
+  if (pantryMode) {
+    if (!PANTRY_CATALOG) { loadPantryCatalog().then(() => { updatePantryCount(); render(); }).catch(() => { hint.style.display = ''; hint.textContent = 'Couldn’t load the pantry catalog. Check your connection.'; }); }
+    hint.style.display = ''; hint.innerHTML = `Showing recipes you can make with what’s on hand (missing up to ${PANTRY_MAX_MISSING} items). Tap a missing item to add it to your Out list. <a onclick="openPantry()">Edit pantry</a>`;
+  } else { hint.style.display = 'none'; }
+  invalidateHave(); render();
+}
+function toggleFavFilter() { favFilter = !favFilter; document.getElementById('btn-fav-filter').classList.toggle('on', favFilter); render(); }
+function openPantry() {
+  document.getElementById('pantry-overlay').classList.add('open'); document.body.style.overflow = 'hidden';
+  const body = document.getElementById('pantry-body'); body.innerHTML = '<div class="pantry-empty">Loading…</div>';
+  loadPantryCatalog().then(() => { renderPantry(); syncPantry(false); }).catch(() => { body.innerHTML = '<div class="pantry-empty">Couldn’t load the pantry catalog. Check your connection and try again.</div>'; });
+}
+function closePantry() { document.getElementById('pantry-overlay').classList.remove('open'); document.body.style.overflow = ''; invalidateHave(); if (pantryMode) render(); }
+function setPantryTab(t) { _pantryTab = t; document.querySelectorAll('.pantry-tab').forEach(b => b.classList.toggle('on', b.getAttribute('data-tab') === t)); renderPantry(); }
+function cyclePantry(key) {
+  const p = loadPantry(); const it = pantryItems().find(x => x.k === key); if (!it) return;
+  const cur = pantryState(it, p);
+  const next = cur === 'have' ? 'out' : cur === 'out' ? 'none' : cur === 'growing' ? 'out' : 'have';
+  if (next === pantryDefault(it)) delete p.items[key]; else p.items[key] = next;
+  savePantry(p, true); renderPantry();
+}
+function toggleGrowing(ev, key) {
+  ev.stopPropagation();
+  const p = loadPantry(); const it = pantryItems().find(x => x.k === key); if (!it) return;
+  const cur = pantryState(it, p); const next = cur === 'growing' ? 'have' : 'growing';
+  if (next === pantryDefault(it)) delete p.items[key]; else p.items[key] = next;
+  savePantry(p, true); renderPantry();
+}
+function setPantryStateByName(name, state) {
+  const k = canonIngredient(name); if (!k) return;
+  const p = loadPantry(); let it = pantryItems().find(x => x.k === k);
+  if (!it) { p.custom.push({ k, n: name.toLowerCase(), c: categorize(name) }); it = { k, c: categorize(name) }; }
+  if (state === pantryDefault(it)) delete p.items[k]; else p.items[k] = state;
+  savePantry(p, true);
+  if (document.getElementById('pantry-overlay').classList.contains('open')) renderPantry();
+}
+function addPantryItem() {
+  const inp = document.getElementById('pantry-search'); const name = (inp.value || '').trim(); if (!name) return;
+  setPantryStateByName(name, 'have'); inp.value = ''; renderPantry(); showToast(`Added ${name.toLowerCase()} to pantry`);
+}
+function addToOut(name) { setPantryStateByName(name, 'out'); showToast(`Out list: ${name.toLowerCase()}`); }
+function renderPantry() {
+  if (!PANTRY_CATALOG) return;
+  const p = loadPantry(); const q = (document.getElementById('pantry-search').value || '').trim().toLowerCase();
+  const items = pantryItems(); const body = document.getElementById('pantry-body');
+  const cats = PANTRY_CATALOG.categories;
+  let have = 0, growing = 0, out = 0;
+  items.forEach(it => { const s = pantryState(it, p); if (s === 'have') have++; else if (s === 'growing') growing++; else if (s === 'out') out++; });
+  document.getElementById('pantry-summary').innerHTML = `<span class="pill pill-dish">${have + growing} on hand</span>${growing ? `<span class="pill pill-cuisine">🌱 ${growing} growing</span>` : ''}${out ? `<span class="pill pill-protein">${out} out</span>` : ''}`;
+  document.getElementById('pantry-legend').style.display = _pantryTab === 'all' && !q ? '' : 'none';
+  const show = it => { const s = pantryState(it, p);
+    if (q && !(it.k.includes(q) || it.n.includes(q))) return false;
+    if (_pantryTab === 'have') return s === 'have' || s === 'growing';
+    if (_pantryTab === 'growing') return s === 'growing';
+    if (_pantryTab === 'out') return s === 'out';
+    return true; };
+  let html = '';
+  if (_pantryTab === 'out' && !q) {
+    const outs = items.filter(it => pantryState(it, p) === 'out').sort((a, b) => a.c.localeCompare(b.c) || a.n.localeCompare(b.n));
+    html = outs.length ? '<ul class="out-list">' + outs.map(it => `<li><span>${escapeHtml(it.n)}<span class="cat">${(cats.find(c => c.key === it.c) || {}).label || ''}</span></span><span class="acts"><button onclick="setPantryStateByName('${it.k.replace(/'/g, "\\'")}','have');renderPantry()">Restocked</button><button onclick="setPantryStateByName('${it.k.replace(/'/g, "\\'")}','none');renderPantry()">Don’t keep</button></span></li>`).join('') + '</ul>'
+      : '<div class="pantry-empty">Nothing on the Out list. Tap an item you’ve run out of, or tap a “missing” ingredient on a recipe card.</div>';
+    body.innerHTML = html; return;
+  }
+  cats.forEach(c => {
+    const list = items.filter(it => it.c === c.key && show(it)).sort((a, b) => (b.u - a.u) || a.n.localeCompare(b.n));
+    if (!list.length) return;
+    const onHand = list.filter(it => ['have', 'growing'].includes(pantryState(it, p))).length;
+    html += `<div class="pantry-cat"><div class="pantry-cat-title"><span>${c.icon} ${c.label}</span><span class="cnt">${onHand}/${list.length}</span></div><div class="pantry-chips">` +
+      list.map(it => { const s = pantryState(it, p); const growable = c.key === 'herbs' || c.key === 'produce';
+        return `<span class="pchip ${s === 'none' ? '' : s}" onclick="cyclePantry('${it.k.replace(/'/g, "\\'")}')" title="${s}">${escapeHtml(it.n)}${growable && (s === 'have' || s === 'growing') ? `<span class="g" onclick="toggleGrowing(event,'${it.k.replace(/'/g, "\\'")}')" title="Growing at home">🌱</span>` : ''}</span>`; }).join('') + '</div></div>';
+  });
+  if (!html) html = `<div class="pantry-empty">${q ? `No match for “${escapeHtml(q)}”.` : 'Nothing here yet.'}</div>`;
+  if (q) html += `<div class="pantry-add"><button class="btn-log-action" onclick="addPantryItem()">Add “${escapeHtml(q)}” to pantry</button></div>`;
+  body.innerHTML = html;
+}
+function copyOutList() {
+  const p = loadPantry(); const outs = pantryItems().filter(it => pantryState(it, p) === 'out').map(it => it.n);
+  if (!outs.length) { showToast('Out list is empty'); return; }
+  const text = 'Out of:\n' + outs.map(n => '• ' + n).join('\n');
+  (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => showToast('Out list copied')).catch(() => { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); showToast('Out list copied'); } catch (e) {} document.body.removeChild(ta); });
+}
+// Sync with the Larder service (Pantry tab in the Google Sheet)
+let _pantrySyncTimer = null;
+function schedulePantrySync() { clearTimeout(_pantrySyncTimer); _pantrySyncTimer = setTimeout(() => syncPantry(false), 1500); }
+async function syncPantry(verbose) {
+  const url = getSyncUrl(); const note = document.getElementById('pantry-sync-note');
+  if (!url) { if (note) note.textContent = 'Saved on this device.'; return; }
+  try {
+    let p = loadPantry();
+    if (p.dirty) {
+      const res = await fetch(url, { method: 'POST', body: JSON.stringify({ pantry: { items: p.items, custom: p.custom, updated: p.updated } }) });
+      if (!res.ok) throw new Error('push ' + res.status);
+      const j = await res.json().catch(() => ({}));
+      if (j && j.error) throw new Error(j.error);
+      p.dirty = false; savePantry(p, false);
+    }
+    const res = await fetch(url + (url.includes('?') ? '&' : '?') + 'action=pantry');
+    if (!res.ok) throw new Error('pull ' + res.status);
+    const j = await res.json(); const remote = j && j.pantry;
+    if (j && j.error === 'unknown action') throw new Error('service needs updating');
+    p = loadPantry();
+    if (remote && remote.updated && remote.updated > (p.updated || '') && !p.dirty) {
+      savePantry({ items: remote.items || {}, custom: remote.custom || [], updated: remote.updated, dirty: false }, false);
+      if (document.getElementById('pantry-overlay').classList.contains('open')) renderPantry();
+      invalidateHave(); if (pantryMode) render();
+    }
+    if (note) note.textContent = `Synced ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+  } catch (e) { if (note) note.textContent = 'Sync failed (' + e.message + '). Saved on this device.'; if (verbose) showToast('Pantry sync failed: ' + e.message); }
+}
+function forgetDevice() {
+  try { localStorage.removeItem('larder_auth_device'); } catch (e) {}
+  sessionStorage.removeItem('larder_auth'); location.reload();
+}
+loadPantryCatalog().then(() => updatePantryCount()).catch(() => {});
+if (getSyncUrl()) setTimeout(() => syncPantry(false), 2500);
+
 // ── Cooking Log ──
 const LOG_KEY = 'larder_cooklog';
 // DW's cooking-log service (Google Apps Script web app in DW's account; writes to the "Larder Cooking Log" sheet).
@@ -1735,8 +2038,11 @@ async function syncLog(verbose) {
     if (!res.ok) throw new Error('pull failed ' + res.status);
     const remote = await res.json(); const entries = Array.isArray(remote) ? remote : (remote.entries || []);
     const local = loadLog(); const have = new Set(local.map(e => e.ts + '|' + e.id)); let added = 0;
-    entries.forEach(e => { if (e && e.ts && e.id && !have.has(e.ts + '|' + e.id)) { local.push({ ...e, synced: true }); have.add(e.ts + '|' + e.id); added++; } });
-    if (added) { saveLog(local); if (document.getElementById('log-overlay').classList.contains('open')) renderLog(); }
+    let changed = 0;
+    entries.forEach(e => { if (!(e && e.ts && e.id)) return; const key = e.ts + '|' + e.id;
+      if (!have.has(key)) { local.push({ ...e, synced: true }); have.add(key); added++; }
+      else { const l = local.find(x => x.ts + '|' + x.id === key); if (l && l.synced && ((e.rating || 0) !== (l.rating || 0) || (e.note || '') !== (l.note || ''))) { l.rating = e.rating || 0; l.note = e.note || ''; changed++; } } });
+    if (added || changed) { saveLog(local); if (document.getElementById('log-overlay').classList.contains('open')) renderLog(); render(); }
     setSyncStatus(`Synced ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}${added ? ` · ${added} new from shared log` : ''}`);
     const note = document.getElementById('log-storage-note'); if (note) note.textContent = 'Shared log connected.';
   } catch (e) { setSyncStatus('Sync failed: ' + e.message + '. Entries are safe in this browser.'); }
@@ -1756,6 +2062,30 @@ function updateLogCount() {
   if (el) el.textContent = n ? n : '';
 }
 function madeCount(recipeId) { return loadLog().filter(e => e.id === recipeId).length; }
+function latestEntryFor(recipeId) { return loadLog().filter(e => e.id === recipeId).sort((a, b) => b.ts.localeCompare(a.ts))[0]; }
+function favoriteIds() { const s = new Set(); loadLog().forEach(e => { if (e.rating === 1) s.add(e.id); }); loadLog().forEach(e => { if (e.rating === -1 && latestEntryFor(e.id) === e) s.delete(e.id); }); return s; }
+function thumbsDownIds() { const s = new Set(); const seen = {}; loadLog().slice().sort((a, b) => b.ts.localeCompare(a.ts)).forEach(e => { if (!(e.id in seen)) { seen[e.id] = e.rating || 0; if (e.rating === -1) s.add(e.id); } }); return s; }
+function isFavorite(recipeId) { const e = latestEntryFor(recipeId); return !!(e && e.rating === 1); }
+function refreshRateRow(r) {
+  const row = document.getElementById('rate-row'); if (!row) return;
+  const e = latestEntryFor(r.id);
+  if (!e) { row.style.display = 'none'; return; }
+  row.style.display = '';
+  document.getElementById('rate-up').classList.toggle('on', e.rating === 1);
+  document.getElementById('rate-down').classList.toggle('on', e.rating === -1);
+  document.getElementById('rate-note').value = e.note || '';
+}
+function rateRecipe(v) {
+  const r = window._modalRecipe; if (!r) return;
+  const log = loadLog(); const e = log.filter(x => x.id === r.id).sort((a, b) => b.ts.localeCompare(a.ts))[0]; if (!e) return;
+  e.rating = e.rating === v ? 0 : v; e.synced = false; saveLog(log); refreshRateRow(r); syncLogEntry(e); render();
+  showToast(e.rating === 1 ? 'Marked: make again ★' : e.rating === -1 ? 'Marked: not again' : 'Rating cleared');
+}
+function saveRateNote() {
+  const r = window._modalRecipe; if (!r) return;
+  const log = loadLog(); const e = log.filter(x => x.id === r.id).sort((a, b) => b.ts.localeCompare(a.ts))[0]; if (!e) return;
+  e.note = (document.getElementById('rate-note').value || '').trim(); e.synced = false; saveLog(log); syncLogEntry(e); showToast('Note saved');
+}
 function refreshMadeButton(r, just) {
   const b = document.getElementById('modal-made-btn');
   const c = document.getElementById('modal-made-cnt');
@@ -1775,9 +2105,9 @@ function logMade() {
     pantry_staples: r.pantry_staples || []
   };
   const log = loadLog(); log.push(entry); saveLog(log);
-  refreshMadeButton(r, true);
+  refreshMadeButton(r, true); refreshRateRow(r);
   setTimeout(() => refreshMadeButton(r, false), 1200);
-  showToast(`Logged: ${r.title}`);
+  showToast(`Logged: ${r.title} — make again?`);
   syncLogEntry(entry);
 }
 function syncLogEntry(entry) { if (getSyncUrl()) syncLog(false); }
@@ -1823,7 +2153,7 @@ function renderLog() {
   listEl.innerHTML = log.map(e => {
     const d = new Date(e.ts);
     const ds = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + (d.getFullYear() !== new Date().getFullYear() ? ` ${d.getFullYear()}` : '');
-    return `<li class="log-entry"><span class="d">${ds}</span><span class="t">${e.title}${e.servings && e.servings !== e.base_servings ? ` <span class="d">(${e.servings} servings)</span>` : ''}</span><button class="x" title="Remove" onclick="deleteLogEntry('${e.ts}')">✕</button></li>`;
+    return `<li class="log-entry"><span class="d">${ds}</span><span class="t">${e.rating === 1 ? '<span class="r">👍</span>' : e.rating === -1 ? '<span class="r">👎</span>' : ''}${e.title}${e.servings && e.servings !== e.base_servings ? ` <span class="d">(${e.servings} servings)</span>` : ''}${e.note ? `<span class="note">${escapeHtml(e.note)}</span>` : ''}</span><button class="x" title="Remove" onclick="deleteLogEntry('${e.ts}')">✕</button></li>`;
   }).join('');
 }
 function exportLog() {
@@ -2121,8 +2451,8 @@ function buildGroceryList() {
     (r.ingredients || []).forEach(ing => {
       const key = ing.item.toLowerCase().trim();
       const nameLc = key;
-      // Feature 2: route always-pantry items to pantry regardless of quantity
-      if (isPantryStaple(nameLc)) {
+      // Feature 2: route always-pantry items to pantry regardless of quantity; v21: and anything DW's pantry says is on hand
+      if (isPantryStaple(nameLc) || (PANTRY_CATALOG && pantryHas(ing.item))) {
         pantryMap[nameLc] = ing.item;
         return;
       }
@@ -2961,6 +3291,7 @@ window.addEventListener('load', _tryRenderShared);
         <div class="alt-cards" id="modal-alt-cards"></div>
       </div>
       <div class="modal-footer-actions">
+        <div class="rate-row" id="rate-row" style="display:none;width:100%;"><span>Make again?</span><button id="rate-up" onclick="rateRecipe(1)">👍</button><button id="rate-down" onclick="rateRecipe(-1)">👎</button><input id="rate-note" placeholder="Note (optional) — e.g. double the sauce" onchange="saveRateNote()"></div>
         <button class="btn-made" id="modal-made-btn" onclick="logMade()">✓ Made it <span class="cnt" id="modal-made-cnt"></span></button>
         <a class="btn-recipe-card disabled" id="modal-card-btn" href="#" target="_blank">
           ↗ View Recipe Card
@@ -2995,11 +3326,40 @@ window.addEventListener('load', _tryRenderShared);
       </div>
     </div>
     <div class="modal-footer">
-      <span class="modal-file-path" id="log-storage-note">Stored in this browser. Export regularly.</span>
+      <span class="modal-file-path" id="log-storage-note">Stored in this browser. Export regularly. <a href="#" onclick="forgetDevice();return false;" style="color:var(--accent);">Forget this device</a></span>
       <div class="modal-footer-actions">
         <button class="btn-log-action" onclick="document.getElementById('log-import').click()">Import</button>
         <input type="file" id="log-import" accept="application/json,.json" style="display:none" onchange="importLog(this)">
         <button class="btn-log-action" onclick="exportLog()">Export</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Pantry Modal -->
+<div class="modal-overlay" id="pantry-overlay" onclick="if(event.target===this)closePantry()">
+  <div class="modal" id="pantry-modal">
+    <div class="modal-header">
+      <button class="modal-close" onclick="closePantry()">✕</button>
+      <div class="modal-source">The Larder</div>
+      <div class="modal-title">Pantry</div>
+      <div class="modal-pills" id="pantry-summary"></div>
+    </div>
+    <div class="modal-body">
+      <div class="pantry-tabs">
+        <button class="pantry-tab on" data-tab="all" onclick="setPantryTab('all')">All</button>
+        <button class="pantry-tab" data-tab="have" onclick="setPantryTab('have')">Have</button>
+        <button class="pantry-tab" data-tab="growing" onclick="setPantryTab('growing')">🌱 Growing</button>
+        <button class="pantry-tab" data-tab="out" onclick="setPantryTab('out')">Out</button>
+      </div>
+      <div class="pantry-legend" id="pantry-legend">Tap an item: <i style="background:#e8f5ee"></i>have → <i style="background:#fdeaea"></i>out → <i style="background:#fdfaf5"></i>not kept. Tap 🌱 on something you grow. Dried spices are assumed on hand unless you tap them off.</div>
+      <input class="pantry-search" id="pantry-search" placeholder="Search or add an ingredient…" autocomplete="off" oninput="renderPantry()">
+      <div id="pantry-body"></div>
+    </div>
+    <div class="modal-footer">
+      <span class="modal-file-path" id="pantry-sync-note">Saved on this device.</span>
+      <div class="modal-footer-actions">
+        <button class="btn-log-action" id="btn-copy-out" onclick="copyOutList()">Copy Out list</button>
+        <button class="btn-log-action" onclick="syncPantry(true)">Sync now</button>
       </div>
     </div>
   </div>
