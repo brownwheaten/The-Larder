@@ -1,0 +1,42 @@
+name: Refresh local food data
+
+on:
+  schedule:
+    - cron: "17 10 * * 1"   # Mondays ~6:17am Eastern
+  workflow_dispatch: {}      # "Run workflow" button for a manual refresh
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Pull USDA directory and farm catalogs
+        env:
+          # Uses the USDA_API_KEY repository secret if one is set, otherwise the Larder's key.
+          USDA_API_KEY: ${{ secrets.USDA_API_KEY || 'sLd3LgTyTN' }}
+        run: python scripts/refresh_data.py
+
+      - name: Commit updated data
+        run: |
+          if [ -z "$(git status --porcelain -- data/local_sources.json)" ]; then
+            echo "No changes."
+            exit 0
+          fi
+          git config user.name "larder-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/local_sources.json
+          git commit -m "Weekly local food data refresh"
+          git push

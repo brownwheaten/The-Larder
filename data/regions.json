@@ -1,0 +1,7 @@
+{
+  "note": "Areas the weekly refresh covers. Add an anchor ZIP + radius (miles) to cover a new area.",
+  "anchors": [
+    { "name": "Philadelphia", "zip": "19103", "radius": 50 },
+    { "name": "Providence", "zip": "02903", "radius": 50 }
+  ]
+}
