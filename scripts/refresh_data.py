@@ -201,6 +201,15 @@ def snap_label(a):
     return None
 
 
+def incentive_label(raw):
+    """The SNAP data marks stores approved to offer SNAP Healthy Incentives (bonus
+    benefits for produce) with the value "Waiver" (an FNS equal-treatment waiver)."""
+    v = (raw or "").strip()
+    if not v:
+        return None
+    return "Healthy Incentives" if v.lower() == "waiver" else tidy(v)
+
+
 def snap_record(a, label):
     return {
         "listing_id": f"snap-{a.get('Record_ID')}",
@@ -214,7 +223,7 @@ def snap_record(a, label):
         "directory_type": "community",
         "type_label": label,
         "snap": True,
-        **({"incentive": tidy(a["Incentive_Program"])} if (a.get("Incentive_Program") or "").strip() else {}),
+        **({"incentive": incentive_label(a.get("Incentive_Program"))} if incentive_label(a.get("Incentive_Program")) else {}),
     }
 
 
