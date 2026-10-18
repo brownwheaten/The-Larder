@@ -1703,8 +1703,10 @@ document.addEventListener('keydown', e => {
 
 // ── Cooking Log ──
 const LOG_KEY = 'larder_cooklog';
+// DW's cooking-log service (Google Apps Script web app in DW's account; writes to the "Larder Cooking Log" sheet).
+var LARDER_SERVICE_URL = 'https://script.google.com/macros/s/AKfycbxoU5eddEL2uRyC1F8Ronm2JTs078vGjv1IpSWnkOUaIfGP3iJmoDtTQtZZu1UgBHsb8g/exec';
 const SYNC_KEY = 'larder_log_sync_url';
-function getSyncUrl() { try { return localStorage.getItem(SYNC_KEY) || ''; } catch (e) { return ''; } }
+function getSyncUrl() { let v = ''; try { v = localStorage.getItem(SYNC_KEY) || ''; } catch (e) {} return v || LARDER_SERVICE_URL; }
 function saveSyncUrl() {
   const v = (document.getElementById('log-sync-url').value || '').trim();
   if (v && !/^https:\/\/script\.google(usercontent)?\.com\//.test(v)) { setSyncStatus('That doesn\'t look like a Google Apps Script URL.'); return; }
@@ -2324,46 +2326,51 @@ function handleGroceryOverlayClick(e) {
 
 
 // ── Local Sourcing ──
-const USDA_KEY = 'sLd3LgTyTN';
-// Relays (CORS proxies), tried in order. If one is down or blocked, the next is used.
-const PROXIES = [
-  u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
-  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-  u => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(u)}`
-];
-async function proxyFetch(url, timeoutMs) {
-  let lastErr = 'unreachable';
-  for (const make of PROXIES) {
-    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), timeoutMs || 12000);
-    try {
-      const res = await fetch(make(url), { signal: ctrl.signal });
-      const text = await res.text();
-      if (text && text.trim()) return { status: res.status, ok: res.ok, text };
-      lastErr = 'empty response (' + res.status + ')';
-    } catch (e) { lastErr = e.name === 'AbortError' ? 'timeout' : 'unreachable'; }
-    finally { clearTimeout(t); }
+// ── Local food directory (the Larder's own data) ──
+// data/local_sources.json is refreshed weekly by a GitHub Action (scripts/refresh_data.py)
+// that pulls the USDA Local Food Portal. data/zips.json holds ZIP-code centroids.
+// Nothing here depends on a third-party service at search time.
+const LOCAL_RADIUS_MI = 25;
+let _localDataPromise = null;
+function loadLocalData() {
+  if (!_localDataPromise) {
+    const get = p => fetch(p, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error('DATA:' + r.status); return r.json(); });
+    _localDataPromise = Promise.all([get('data/local_sources.json'), get('data/zips.json')])
+      .then(([dir, z]) => ({ dir, zips: z.zips || {} }))
+      .catch(e => { _localDataPromise = null; throw e; });
   }
-  throw new Error('RELAY:' + lastErr);
+  return _localDataPromise;
 }
-async function usdaFetch(kind, zip) {
-  const url = `https://www.usdalocalfoodportal.com/api/${kind}/?apikey=${USDA_KEY}&zip=${zip}&radius=25`;
-  const r = await proxyFetch(url, 15000);
-  if (/apikey error/i.test(r.text)) throw new Error('KEY');
-  let j; try { j = JSON.parse(r.text); } catch (e) { throw new Error('RELAY:bad response'); }
-  return Array.isArray(j) ? j : (j.data || []);
+function milesBetween(lat1, lon1, lat2, lon2) {
+  const R = 3958.8, toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
 }
 async function usdaLookup(zip) {
-  const [markets, farms] = await Promise.all([usdaFetch('farmersmarket', zip), usdaFetch('onfarmmarket', zip)]);
-  const byDist = (a, b) => (parseFloat(a.distance) || 999) - (parseFloat(b.distance) || 999);
-  return { markets: markets.slice().sort(byDist), farms: farms.slice().sort(byDist) };
+  const { dir, zips } = await loadLocalData();
+  const c = zips[zip];
+  if (!c) throw new Error('ZIP');
+  const near = (dir.sources || [])
+    .filter(s => typeof s.location_y === 'number' && typeof s.location_x === 'number')
+    .map(s => ({ ...s, distance: milesBetween(c[0], c[1], s.location_y, s.location_x) }))
+    .filter(s => s.distance <= LOCAL_RADIUS_MI)
+    .sort((a, b) => a.distance - b.distance);
+  return {
+    markets: near.filter(s => s.directory_type === 'farmersmarket'),
+    farms: near.filter(s => s.directory_type !== 'farmersmarket'),
+    updated: dir.updated
+  };
 }
 function usdaErrorMessage(err) {
   const m = (err && err.message) || '';
-  if (m === 'KEY') return 'The USDA rejected the Larder’s API key. The key needs replacing.';
-  if (m.startsWith('RELAY')) return 'Couldn’t reach the USDA through any relay (' + m.slice(6) + '). Try again in a minute.';
+  if (m === 'ZIP') return 'That ZIP isn’t in the Larder’s coverage area yet (Philadelphia and Providence regions).';
+  if (m.startsWith('DATA')) return 'The Larder’s local food directory didn’t load. Check your connection and try again.';
   return 'Something went wrong looking up local sources. Try again.';
 }
 function fmtMiles(d) { const n = parseFloat(d); return isNaN(n) ? '' : (n < 10 ? n.toFixed(1) : Math.round(n)) + ' mi'; }
+function fmtUpdated(iso) { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); }
+function catalogKey(origin) { return 'usda_' + origin.replace(/^https?:\/\/(www\.)?/, '').replace(/[^a-z0-9]/gi, '_').toLowerCase(); }
 
 const LOCALLY_SOURCEABLE_CATEGORIES = ['produce', 'meat', 'seafood', 'dairy', 'nuts', 'bakery'];
 
@@ -2417,36 +2424,43 @@ async function findLocalSources() {
   resultsEl.innerHTML = '<div class="local-status">Looking for farms and markets near you...</div>';
 
   try {
-    const { markets, farms } = await usdaLookup(zip);
+    const { markets, farms, updated } = await usdaLookup(zip);
 
     const allResults = [
-      ...markets.slice(0, 8).map(m => ({ ...m, _type: 'Farmers Market' })),
-      ...farms.slice(0, 15).map(f => ({ ...f, _type: 'On-Farm Market' }))
-    ].sort((a, b) => (parseFloat(a.distance) || 999) - (parseFloat(b.distance) || 999));
+      ...markets.slice(0, 8).map(m => ({ ...m, _type: m.type_label || 'Farmers Market' })),
+      ...farms.slice(0, 15).map(f => ({ ...f, _type: f.type_label || 'On-Farm Market' }))
+    ].sort((a, b) => a.distance - b.distance);
     window._usdaResults = allResults;
 
     if (allResults.length === 0) {
-      resultsEl.innerHTML = '<div class="local-status">No farmers markets or farms found within 25 miles. Try a different ZIP code or increase your search area.</div>';
+      resultsEl.innerHTML = `<div class="local-status">No farms, markets, or CSAs in the directory within ${LOCAL_RADIUS_MI} miles of ${zip}.</div>`;
     } else {
       const totalFound = markets.length + farms.length;
-      let html = `<div class="local-status" style="font-style:normal;font-weight:600;margin-bottom:0.5rem;">${totalFound} local sources found · nearest ${allResults.length} shown</div>`;
+      const onlineCount = allResults.filter(r => r.catalog && r.catalog.length).length;
+      let html = `<div class="local-status" style="font-style:normal;font-weight:600;margin-bottom:0.2rem;">${totalFound} local source${totalFound === 1 ? '' : 's'} within ${LOCAL_RADIUS_MI} mi · nearest ${allResults.length} shown${onlineCount ? ` · ${onlineCount} sell online` : ''}</div>`;
+      html += `<div class="local-status" style="margin-bottom:0.5rem;">USDA directory · updated ${fmtUpdated(updated)}</div>`;
       allResults.forEach((r, idx) => {
-        const name = r.listing_name || r.Location_Desc || 'Unnamed';
-        const city = r.location_city || '';
-        const state = r.location_state || '';
-        const website = r.media_website || '';
+        const name = escapeHtml(r.listing_name || 'Unnamed');
+        const city = escapeHtml(r.location_city || '');
+        const state = escapeHtml(r.location_state || '');
+        const origin = r.media_website ? siteOrigin(r.media_website.trim()) : null;
+        const website = origin ? (/^https?:/i.test(r.media_website.trim()) ? r.media_website.trim() : 'https://' + r.media_website.trim()) : '';
         const type = r._type;
-        const schedule = r.Season1Date || r.listing_desc || '';
+        const schedule = escapeHtml(r.brief_desc || r.listing_desc || '');
+        let catalogHtml = '';
+        if (r.catalog && r.catalog.length && r.shop_origin) {
+          const key = catalogKey(r.shop_origin);
+          const added = !!loadCustom().sources[key];
+          catalogHtml = `🛒 ${r.catalog.length} products online <button id="add-${idx}" class="${added ? 'added' : ''}" onclick="addCatalogSource(${idx}, '${key}')" ${added ? 'disabled' : ''}>${added ? 'Added' : 'Add prices'}</button>`;
+        }
 
         html += `<div class="local-result-item">
           <div class="local-result-name">${name}</div>
           <div class="local-result-meta">${type}${city ? ' · ' + city + (state ? ', ' + state : '') : ''}${r.distance != null ? ' · ' + fmtMiles(r.distance) : ''}${schedule ? ' · ' + schedule.substring(0,60) : ''}</div>
-          ${website ? `<a class="local-result-link" href="${website.startsWith('http') ? website : 'https://' + website}" target="_blank">Visit website ↗</a>` : ''}
-          <div class="local-catalog" id="catalog-${idx}"></div>
+          ${website ? `<a class="local-result-link" href="${escapeHtml(website)}" target="_blank" rel="noopener">Visit website ↗</a>` : ''}
+          <div class="local-catalog ${catalogHtml ? 'yes' : ''}" id="catalog-${idx}">${catalogHtml}</div>
         </div>`;
       });
-      const withSites = allResults.filter(r => r.media_website).length;
-      if (withSites) html = `<button class="btn-check-online" id="btn-check-online" onclick="checkOnlineCatalogs()">Check which of these sell online (${withSites} with websites)</button>` + html;
       resultsEl.innerHTML = html;
       renderCustomSources();
     }
@@ -2487,56 +2501,13 @@ function renderCustomSources() {
 function siteOrigin(website) {
   try { return new URL(website.startsWith('http') ? website : 'https://' + website).origin; } catch (e) { return null; }
 }
-async function fetchShopifyCatalog(origin) {
-  try {
-    const r = await proxyFetch(origin + '/products.json?limit=250', 9000);
-    let j; try { j = JSON.parse(r.text); } catch (e) { return { ok: false, reason: 'not shopify' }; }
-    if (!j || !Array.isArray(j.products)) return { ok: false, reason: 'not shopify' };
-    return { ok: true, products: j.products };
-  } catch (e) { return { ok: false, reason: (e.message || '').replace('RELAY:', '') || 'unreachable' }; }
-}
-function shopifyToProducts(sourceKey, products) {
-  const out = [];
-  products.forEach(pr => {
-    const title = (pr.title || '').trim(); if (!title || /gift card|donation|membership|subscription/i.test(title)) return;
-    const variants = (pr.variants || []).filter(v => v.available !== false && parseFloat(v.price) > 0);
-    if (!variants.length) return;
-    const v = variants.slice().sort((a, b) => parseFloat(a.price) - parseFloat(b.price))[0];
-    const unit = (v.title && v.title !== 'Default Title') ? v.title : (pr.product_type || 'each');
-    out.push({ item: title, source: sourceKey, price: parseFloat(v.price), unit: unit.substring(0, 24), category: categorize(title) || 'other' });
-  });
-  return out;
-}
-async function checkOnlineCatalogs() {
-  const results = window._usdaResults || []; const btn = document.getElementById('btn-check-online');
-  if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
-  window._catalogHits = {};
-  const targets = results.map((r, idx) => ({ r, idx, origin: r.media_website ? siteOrigin(r.media_website) : null })).filter(t => t.origin);
-  let done = 0, hits = 0, i = 0;
-  async function worker() {
-    while (i < targets.length) {
-      const t = targets[i++]; const el = document.getElementById('catalog-' + t.idx);
-      if (el) el.textContent = 'checking…';
-      const res = await fetchShopifyCatalog(t.origin);
-      done++;
-      if (res.ok) {
-        hits++; window._catalogHits[t.idx] = res.products;
-        const key = 'usda_' + t.origin.replace(/^https?:\/\/(www\.)?/, '').replace(/[^a-z0-9]/gi, '_').toLowerCase();
-        const already = !!loadCustom().sources[key];
-        if (el) { el.className = 'local-catalog yes'; el.innerHTML = `🛒 ${res.products.length} products online <button id="add-${t.idx}" class="${already ? 'added' : ''}" onclick="addCatalogSource(${t.idx}, '${key}')" ${already ? 'disabled' : ''}>${already ? 'Added' : 'Add prices'}</button>`; }
-      } else if (el) { el.className = 'local-catalog no'; el.textContent = res.reason === 'not shopify' ? 'no public catalog' : `couldn't check (${res.reason})`; }
-      if (btn) btn.textContent = `Checking… ${done}/${targets.length}`;
-    }
-  }
-  await Promise.all([worker(), worker(), worker()]);
-  if (btn) { btn.disabled = false; btn.textContent = `${hits} of ${targets.length} sell online with pullable prices`; }
-}
 function addCatalogSource(idx, key) {
-  const r = (window._usdaResults || [])[idx]; const products = (window._catalogHits || {})[idx]; if (!r || !products) return;
-  const origin = siteOrigin(r.media_website);
+  const r = (window._usdaResults || [])[idx];
+  if (!r || !r.catalog || !r.catalog.length) return;
   const c = loadCustom();
-  c.sources[key] = { name: r.listing_name || 'Local source', type: r._type || 'Local Farm', location: [r.location_city, r.location_state].filter(Boolean).join(', '), website: origin, added: new Date().toISOString() };
-  c.products = c.products.filter(p => p.source !== key).concat(shopifyToProducts(key, products));
+  c.sources[key] = { name: r.listing_name || 'Local source', type: r._type || 'Local Farm', location: [r.location_city, r.location_state].filter(Boolean).join(', '), website: r.shop_origin, added: new Date().toISOString() };
+  c.products = c.products.filter(p => p.source !== key).concat(
+    r.catalog.map(p => ({ item: p.t, source: key, price: p.p, unit: p.u, category: categorize(p.t) || 'other' })));
   saveCustom(c); applyCustomSources(); renderCustomSources();
   const b = document.getElementById('add-' + idx); if (b) { b.textContent = 'Added'; b.className = 'added'; b.disabled = true; }
   if (window._lastGroceryData) updatePriceComparison(window._lastGroceryData.grouped);
@@ -2897,15 +2868,15 @@ async function findFarmsSharedView() {
     return;
   }
   btn.disabled = true; btn.textContent = 'Searching…';
-  resultsEl.innerHTML = '<div style="font-size:0.78rem;color:var(--muted);">Searching USDA database…</div>';
+  resultsEl.innerHTML = '<div style="font-size:0.78rem;color:var(--muted);">Looking up local sources…</div>';
   try {
     const { markets, farms } = await usdaLookup(zip);
     const combined = [];
-    markets.forEach(x => combined.push({...x, _type: 'Farmers Market'}));
-    farms.forEach(x => combined.push({...x, _type: 'On-Farm Market'}));
-    combined.sort((a, b) => (parseFloat(a.distance) || 999) - (parseFloat(b.distance) || 999));
+    markets.forEach(x => combined.push({...x, _type: x.type_label || 'Farmers Market'}));
+    farms.forEach(x => combined.push({...x, _type: x.type_label || 'On-Farm Market'}));
+    combined.sort((a, b) => a.distance - b.distance);
     if (combined.length === 0) {
-      resultsEl.innerHTML = '<div style="font-size:0.82rem;color:var(--muted);">No local sources found within 25 miles of ' + zip + '.</div>';
+      resultsEl.innerHTML = '<div style="font-size:0.82rem;color:var(--muted);">No local sources in the directory within ' + LOCAL_RADIUS_MI + ' miles of ' + zip + '.</div>';
     } else {
       let h = `<div style="font-size:0.78rem;color:var(--muted);margin-bottom:0.5rem;">${combined.length} local source${combined.length===1?'':'s'} found:</div>`;
       combined.slice(0, 12).forEach(x => {

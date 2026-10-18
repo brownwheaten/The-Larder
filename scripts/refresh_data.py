@@ -83,8 +83,28 @@ def fetch_directory(kind, zip_code, radius):
     return None
 
 
+STATE_ABBR = {
+    "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR", "california": "CA", "colorado": "CO",
+    "connecticut": "CT", "delaware": "DE", "district of columbia": "DC", "florida": "FL", "georgia": "GA",
+    "hawaii": "HI", "idaho": "ID", "illinois": "IL", "indiana": "IN", "iowa": "IA", "kansas": "KS",
+    "kentucky": "KY", "louisiana": "LA", "maine": "ME", "maryland": "MD", "massachusetts": "MA",
+    "michigan": "MI", "minnesota": "MN", "mississippi": "MS", "missouri": "MO", "montana": "MT",
+    "nebraska": "NE", "nevada": "NV", "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM",
+    "new york": "NY", "north carolina": "NC", "north dakota": "ND", "ohio": "OH", "oklahoma": "OK",
+    "oregon": "OR", "pennsylvania": "PA", "rhode island": "RI", "south carolina": "SC", "south dakota": "SD",
+    "tennessee": "TN", "texas": "TX", "utah": "UT", "vermont": "VT", "virginia": "VA", "washington": "WA",
+    "west virginia": "WV", "wisconsin": "WI", "wyoming": "WY",
+}
+
+
 def clean(row, kind):
     out = {k: row.get(k) for k in KEEP_FIELDS if row.get(k) not in (None, "")}
+    if "location_state" in out:
+        st = str(out["location_state"]).strip()
+        out["location_state"] = STATE_ABBR.get(st.lower(), st.upper() if len(st) == 2 else st)
+    if "location_city" in out:
+        city = str(out["location_city"]).strip()
+        out["location_city"] = city.title() if city.isupper() or city.islower() else city
     out["directory_type"] = kind
     out["type_label"] = DIRECTORIES[kind]
     for k in ("location_x", "location_y"):
