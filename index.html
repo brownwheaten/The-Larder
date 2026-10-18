@@ -1116,6 +1116,12 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
   .local-results {
     margin-top: 0.8rem;
   }
+  .local-badge { display:inline-block; font-size:0.66rem; font-weight:600; letter-spacing:0.03em; padding:0.08rem 0.4rem; border-radius:3px; margin:0.25rem 0.3rem 0 0; }
+  .local-badge.snap { background:#e3eefa; color:#1f5a96; border:1px solid #bcd3ec; }
+  .local-badge.incentive { background:#fdf1dc; color:#8a5a00; border:1px solid #f0d6a4; }
+  .local-badge.coop { background:#efe7f6; color:#5d3b80; border:1px solid #d9c7ea; }
+  .local-snap-toggle { display:inline-flex; align-items:center; gap:0.35rem; font-size:0.75rem; color:var(--ink); margin-top:0.6rem; cursor:pointer; user-select:none; }
+  .local-snap-toggle input { accent-color:#1f5a96; }
   .btn-check-online {
     margin-top: 0.6rem; background: var(--card); color: var(--accent); border: 1.5px solid var(--accent); border-radius: 4px;
     padding: 0.5rem 0.9rem; font-family: 'Inter', sans-serif; font-size: 0.76rem; font-weight: 600; cursor: pointer;
@@ -2359,6 +2365,7 @@ async function usdaLookup(zip) {
   return {
     markets: near.filter(s => s.directory_type === 'farmersmarket'),
     farms: near.filter(s => s.directory_type !== 'farmersmarket'),
+    all: near,
     updated: dir.updated
   };
 }
@@ -2369,6 +2376,13 @@ function usdaErrorMessage(err) {
   return 'Something went wrong looking up local sources. Try again.';
 }
 function fmtMiles(d) { const n = parseFloat(d); return isNaN(n) ? '' : (n < 10 ? n.toFixed(1) : Math.round(n)) + ' mi'; }
+function localBadges(r) {
+  let b = '';
+  if (r.snap) b += '<span class="local-badge snap">SNAP/EBT</span>';
+  if (r.incentive) b += `<span class="local-badge incentive">${escapeHtml(r.incentive)}</span>`;
+  if (r.type_label === 'Food Co-op') b += '<span class="local-badge coop">Co-op</span>';
+  return b ? `<div>${b}</div>` : '';
+}
 function fmtUpdated(iso) { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); }
 function catalogKey(origin) { return 'usda_' + origin.replace(/^https?:\/\/(www\.)?/, '').replace(/[^a-z0-9]/gi, '_').toLowerCase(); }
 
@@ -2424,21 +2438,20 @@ async function findLocalSources() {
   resultsEl.innerHTML = '<div class="local-status">Looking for farms and markets near you...</div>';
 
   try {
-    const { markets, farms, updated } = await usdaLookup(zip);
-
-    const allResults = [
-      ...markets.slice(0, 8).map(m => ({ ...m, _type: m.type_label || 'Farmers Market' })),
-      ...farms.slice(0, 15).map(f => ({ ...f, _type: f.type_label || 'On-Farm Market' }))
-    ].sort((a, b) => a.distance - b.distance);
+    const { all, updated } = await usdaLookup(zip);
+    const snapOnly = !!(document.getElementById('local-snap-only') || {}).checked;
+    const pool = snapOnly ? all.filter(s => s.snap) : all;
+    const allResults = pool.slice(0, 25).map(s => ({ ...s, _type: s.type_label || 'Local Source' }));
     window._usdaResults = allResults;
 
     if (allResults.length === 0) {
-      resultsEl.innerHTML = `<div class="local-status">No farms, markets, or CSAs in the directory within ${LOCAL_RADIUS_MI} miles of ${zip}.</div>`;
+      resultsEl.innerHTML = `<div class="local-status">No ${snapOnly ? 'SNAP-accepting ' : ''}farms, markets, co-ops, or CSAs in the directory within ${LOCAL_RADIUS_MI} miles of ${zip}.</div>`;
     } else {
-      const totalFound = markets.length + farms.length;
+      const totalFound = pool.length;
       const onlineCount = allResults.filter(r => r.catalog && r.catalog.length).length;
-      let html = `<div class="local-status" style="font-style:normal;font-weight:600;margin-bottom:0.2rem;">${totalFound} local source${totalFound === 1 ? '' : 's'} within ${LOCAL_RADIUS_MI} mi · nearest ${allResults.length} shown${onlineCount ? ` · ${onlineCount} sell online` : ''}</div>`;
-      html += `<div class="local-status" style="margin-bottom:0.5rem;">USDA directory · updated ${fmtUpdated(updated)}</div>`;
+      const snapCount = all.filter(s => s.snap).length;
+      let html = `<div class="local-status" style="font-style:normal;font-weight:600;margin-bottom:0.2rem;">${totalFound} ${snapOnly ? 'SNAP-accepting ' : ''}local source${totalFound === 1 ? '' : 's'} within ${LOCAL_RADIUS_MI} mi · nearest ${allResults.length} shown${!snapOnly && snapCount ? ` · ${snapCount} take${snapCount === 1 ? 's' : ''} SNAP` : ''}${onlineCount ? ` · ${onlineCount} sell online` : ''}</div>`;
+      html += `<div class="local-status" style="margin-bottom:0.5rem;">USDA local food directory + SNAP retailer data · updated ${fmtUpdated(updated)}</div>`;
       allResults.forEach((r, idx) => {
         const name = escapeHtml(r.listing_name || 'Unnamed');
         const city = escapeHtml(r.location_city || '');
@@ -2457,6 +2470,7 @@ async function findLocalSources() {
         html += `<div class="local-result-item">
           <div class="local-result-name">${name}</div>
           <div class="local-result-meta">${type}${city ? ' · ' + city + (state ? ', ' + state : '') : ''}${r.distance != null ? ' · ' + fmtMiles(r.distance) : ''}${schedule ? ' · ' + schedule.substring(0,60) : ''}</div>
+          ${localBadges(r)}
           ${website ? `<a class="local-result-link" href="${escapeHtml(website)}" target="_blank" rel="noopener">Visit website ↗</a>` : ''}
           <div class="local-catalog ${catalogHtml ? 'yes' : ''}" id="catalog-${idx}">${catalogHtml}</div>
         </div>`;
@@ -2873,7 +2887,7 @@ async function findFarmsSharedView() {
     const { markets, farms } = await usdaLookup(zip);
     const combined = [];
     markets.forEach(x => combined.push({...x, _type: x.type_label || 'Farmers Market'}));
-    farms.forEach(x => combined.push({...x, _type: x.type_label || 'On-Farm Market'}));
+    farms.forEach(x => combined.push({...x, _type: x.type_label || 'Local Source'}));
     combined.sort((a, b) => a.distance - b.distance);
     if (combined.length === 0) {
       resultsEl.innerHTML = '<div style="font-size:0.82rem;color:var(--muted);">No local sources in the directory within ' + LOCAL_RADIUS_MI + ' miles of ' + zip + '.</div>';
@@ -2883,6 +2897,7 @@ async function findFarmsSharedView() {
         h += `<div style="padding:0.5rem 0;border-bottom:1px solid var(--border);font-size:0.85rem;">
           <strong>${escapeHtml(x.listing_name || 'Unnamed')}</strong>
           <span style="font-size:0.7rem;color:var(--muted);margin-left:0.4rem;">${x._type}${x.distance != null ? ' · ' + fmtMiles(x.distance) : ''}</span>
+          ${localBadges(x)}
           <div style="font-size:0.75rem;color:var(--muted);">${escapeHtml(x.location_address || '')} ${escapeHtml(x.location_city || '')}, ${escapeHtml(x.location_state || '')}</div>
         </div>`;
       });
@@ -3030,6 +3045,7 @@ window.addEventListener('load', _tryRenderShared);
         <button class="btn-find-local" id="btn-find-local" onclick="findLocalSources()">Find Farms & Markets</button>
         <span class="local-radius-note">within 25 miles</span>
       </div>
+      <label class="local-snap-toggle"><input type="checkbox" id="local-snap-only" onchange="if(document.getElementById('local-zip-input').value.trim().length===5)findLocalSources()"> Only places that take SNAP/EBT</label>
       <div class="local-results" id="local-results"></div>
     </div>
 

@@ -1,0 +1,17 @@
+{
+  "note": "Community vendors that should always appear in Source Locally, even if they're missing from the USDA or SNAP data. SNAP status is filled in automatically when the SNAP data has a match nearby. Coordinates are approximate (street-level).",
+  "vendors": [
+    {
+      "listing_name": "Urban Greens Co-op Market",
+      "type_label": "Food Co-op",
+      "location_address": "93 Cranston Street",
+      "location_city": "Providence",
+      "location_state": "RI",
+      "location_zipcode": "02907",
+      "location_y": 41.8166,
+      "location_x": -71.4235,
+      "media_website": "https://www.urbangreens.com",
+      "brief_desc": "Community-owned food co-op in Providence's West End"
+    }
+  ]
+}
