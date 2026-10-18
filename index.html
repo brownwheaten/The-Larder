@@ -72,6 +72,14 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The Larder</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#1c1a17">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Larder">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Inter:wght@300;400;500;600&display=swap');
 
@@ -1177,6 +1185,17 @@ var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZa
   .log-entry .r { margin-right: 0.3rem; }
   .log-entry .note { display:block; font-size:0.74rem; color: var(--muted); font-style: italic; }
   @media (max-width: 600px) { .pantry-add { flex-wrap: wrap; } }
+  /* ── App updates / offline ── */
+  .update-banner {
+    position: fixed; left: 50%; bottom: 1.2rem; transform: translateX(-50%) translateY(150%); z-index: 600;
+    background: var(--ink); color: var(--paper); border: 1px solid #c8860a; border-radius: 6px; padding: 0.7rem 1rem;
+    font-family: 'Inter', sans-serif; font-size: 0.85rem; display: flex; gap: 0.8rem; align-items: center;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.25); transition: transform 0.3s; max-width: calc(100vw - 2rem);
+  }
+  .update-banner.show { transform: translateX(-50%) translateY(0); }
+  .update-banner button { background: #c8860a; color: var(--ink); border: none; border-radius: 4px; padding: 0.4rem 0.8rem; font-weight: 600; font-family: 'Inter', sans-serif; cursor: pointer; white-space: nowrap; }
+  .offline-pill { position: fixed; top: 0.6rem; right: 0.6rem; z-index: 600; background: #8a1f1f; color: #fff; font-family: 'Inter', sans-serif; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.05em; padding: 0.25rem 0.6rem; border-radius: 999px; display: none; }
+  body.is-offline .offline-pill { display: block; }
   .btn-check-online {
     margin-top: 0.6rem; background: var(--card); color: var(--accent); border: 1.5px solid var(--accent); border-radius: 4px;
     padding: 0.5rem 0.9rem; font-family: 'Inter', sans-serif; font-size: 0.76rem; font-weight: 600; cursor: pointer;
@@ -1978,7 +1997,12 @@ function copyOutList() {
 // Sync with the Larder service (Pantry tab in the Google Sheet)
 let _pantrySyncTimer = null;
 function schedulePantrySync() { clearTimeout(_pantrySyncTimer); _pantrySyncTimer = setTimeout(() => syncPantry(false), 1500); }
+let _pantrySyncing = null;
 async function syncPantry(verbose) {
+  if (_pantrySyncing) { await _pantrySyncing.catch(() => {}); if (!loadPantry().dirty && !verbose) return; }
+  _pantrySyncing = _syncPantryOnce(verbose); try { await _pantrySyncing; } finally { _pantrySyncing = null; }
+}
+async function _syncPantryOnce(verbose) {
   const url = getSyncUrl(); const note = document.getElementById('pantry-sync-note');
   if (!url) { if (note) note.textContent = 'Saved on this device.'; return; }
   try {
@@ -2010,6 +2034,24 @@ function forgetDevice() {
 loadPantryCatalog().then(() => updatePantryCount()).catch(() => {});
 if (getSyncUrl()) setTimeout(() => syncPantry(false), 2500);
 
+// ── Home-screen app + offline (service worker) ──
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+  navigator.serviceWorker.addEventListener('message', ev => {
+    if (ev.data && ev.data.type === 'larder-updated') document.getElementById('update-banner').classList.add('show');
+  });
+}
+function setOnlineState() {
+  const off = navigator.onLine === false;
+  document.body.classList.toggle('is-offline', off);
+  if (!off && getSyncUrl()) { syncLog(false); syncPantry(false); }  // send anything saved while offline
+}
+window.addEventListener('online', setOnlineState);
+window.addEventListener('offline', setOnlineState);
+if (navigator.onLine === false) document.body.classList.add('is-offline');
+
 // ── Cooking Log ──
 const LOG_KEY = 'larder_cooklog';
 // DW's cooking-log service (Google Apps Script web app in DW's account; writes to the "Larder Cooking Log" sheet).
@@ -2023,7 +2065,13 @@ function saveSyncUrl() {
   setSyncStatus(v ? 'Saved. Syncing…' : 'Shared log turned off.'); if (v) syncLog(true);
 }
 function setSyncStatus(msg) { const el = document.getElementById('sync-status'); if (el) el.textContent = msg; }
+let _logSyncing = null;
 async function syncLog(verbose) {
+  // One sync at a time: overlapping calls (e.g. two "back online" signals) would send the same entries twice.
+  if (_logSyncing) { await _logSyncing.catch(() => {}); if (!loadLog().some(e => !e.synced) && !verbose) return; }
+  _logSyncing = _syncLogOnce(verbose); try { await _logSyncing; } finally { _logSyncing = null; }
+}
+async function _syncLogOnce(verbose) {
   const url = getSyncUrl(); if (!url) { if (verbose) setSyncStatus('No shared log URL saved.'); return; }
   try {
     // 1. push anything not yet synced
@@ -3365,6 +3413,8 @@ window.addEventListener('load', _tryRenderShared);
   </div>
 </div>
 <div class="log-toast" id="log-toast"></div>
+<div class="update-banner" id="update-banner"><span>A new version of the Larder is ready.</span><button onclick="location.reload()">Reload</button></div>
+<div class="offline-pill" id="offline-pill" title="No connection. The Larder still works; changes sync when you're back online.">OFFLINE</div>
 
 <!-- Grocery Selection Bar -->
 <div class="grocery-bar" id="grocery-bar">
