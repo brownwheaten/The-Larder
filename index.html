@@ -1961,10 +1961,21 @@ function pantryHas(itemName, have) {
   have = have || haveSetCached();
   const k = canonIngredient(itemName); if (!k) return true;
   if (have.has(k)) return true;
-  // generic fallbacks: "chicken" covers chicken breast etc.; a have-item that is a word-boundary prefix/suffix of the ingredient
-  for (const hk of have) { if (hk.length >= 4 && (k === hk || k.endsWith(' ' + hk) || k.startsWith(hk + ' '))) return true; }
+  // Generic fallbacks, deliberately narrow (v24.1):
+  //  - "onion" covers "red onion": only when the extra word is a plain variety word (color, sweet, baby...)
+  //  - "chicken" covers "chicken breast", "garlic" covers "garlic clove": only when the extra word is a cut or a unit
+  // A looser match had "milk" covering "condensed milk" and a stray "ground" entry covering ground beef.
+  const words = k.split(' ');
+  if (words.length === 2) {
+    const [a, b] = words;
+    if (PANTRY_VARIETY.has(a) && have.has(b) && !PANTRY_IGNORE.has(b)) return true;
+    if (PANTRY_CUTS.has(b) && have.has(a) && !PANTRY_IGNORE.has(a)) return true;
+  }
   return false;
 }
+const PANTRY_IGNORE = new Set(['ground', 'dried', 'fresh', 'whole', 'packet', 'container', 'can', 'jar']);
+const PANTRY_VARIETY = new Set(['red', 'yellow', 'white', 'green', 'purple', 'golden', 'sweet', 'baby', 'english', 'persian', 'roma', 'plum', 'vidalia', 'spanish', 'italian', 'flat-leaf', 'curly', 'navel', 'meyer', 'key', 'seedless', 'hothouse', 'mini', 'large', 'small', 'rainbow', 'tri-color', 'tricolor', 'israeli', 'pearl', 'moroccan', 'philadelphia', 'organic', 'grass-fed']);
+const PANTRY_CUTS = new Set(['breast', 'thigh', 'drumstick', 'wing', 'cutlet', 'tenderloin', 'strip', 'loin', 'leg', 'fillet', 'filet', 'clove', 'head', 'bunch', 'sprig', 'leaf', 'floret', 'heart', 'stalk', 'rib', 'wedge', 'half', 'pasta']);
 function recipeMissing(r, have) {
   have = have || haveSetCached(); const miss = [];
   (r.ingredients || []).forEach(i => {
@@ -2752,7 +2763,7 @@ function buildGroceryList() {
       const key = ing.item.toLowerCase().trim();
       const nameLc = key;
       // Feature 2: route always-pantry items to pantry regardless of quantity; v21: and anything DW's pantry says is on hand
-      if (isPantryStaple(nameLc) || (PANTRY_CATALOG && pantryHas(ing.item))) {
+      if (isPantryStaple(nameLc) || (PANTRY_CATALOG && canonIngredient(ing.item) && pantryHas(ing.item))) {
         pantryMap[nameLc] = ing.item;
         return;
       }
